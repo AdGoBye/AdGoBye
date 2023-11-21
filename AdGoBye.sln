@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdGoBye", "AdGoBye\AdGoBye.csproj", "{87052FF6-AFBE-4A89-A8C7-FAF18A35C85A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdGoBye.Plugins", "AdGoBye.Plugins\AdGoBye.Plugins.csproj", "{59005383-6DC5-4DF4-AB41-3DD62D5E4418}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdGoBye.ExamplePlugin", "AdGoBye.ExamplePlugin\AdGoBye.ExamplePlugin.csproj", "{128897F0-3814-4756-B95E-564FF0EEF5C2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{87052FF6-AFBE-4A89-A8C7-FAF18A35C85A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{87052FF6-AFBE-4A89-A8C7-FAF18A35C85A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{87052FF6-AFBE-4A89-A8C7-FAF18A35C85A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{87052FF6-AFBE-4A89-A8C7-FAF18A35C85A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{59005383-6DC5-4DF4-AB41-3DD62D5E4418}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{59005383-6DC5-4DF4-AB41-3DD62D5E4418}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{59005383-6DC5-4DF4-AB41-3DD62D5E4418}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{59005383-6DC5-4DF4-AB41-3DD62D5E4418}.Release|Any CPU.Build.0 = Release|Any CPU
+		{128897F0-3814-4756-B95E-564FF0EEF5C2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{128897F0-3814-4756-B95E-564FF0EEF5C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{128897F0-3814-4756-B95E-564FF0EEF5C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{128897F0-3814-4756-B95E-564FF0EEF5C2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
