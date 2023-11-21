@@ -54,7 +54,8 @@ Names like Flirtual and Nevermet get away with no repercussions for preying on t
 During the EAC mod purge, it was justified that external tooling like mods impede the vision of world creators.
 While that is valid to a degree, the question is where this ends:
 
-![](Marketing/rainyrooftop_nevermet.webm)
+[rainyrooftop_nevermet.webm](https://github.com/AdGoBye/AdGoBye/assets/126194895/62b9799f-f4e0-4387-9f8c-042889d3625c)
+
 
 <Sub>this guy must have startled everybody at least once</sub>
 
