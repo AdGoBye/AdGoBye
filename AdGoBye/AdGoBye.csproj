@@ -22,8 +22,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <None Include="bin\Debug\net7.0\blocklist\AGBBase.toml" />
-      <None Include="bin\Debug\net7.0\blocklist\AGBCommunity.toml" />
       <None Update="appsettings.json">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
