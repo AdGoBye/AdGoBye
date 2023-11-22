@@ -1,4 +1,5 @@
 using AdGoBye;
+using AdGoBye.Plugins;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -17,7 +18,9 @@ foreach (var plugin in PluginLoader.LoadedPlugins)
     Log.Information("Plugin {Name} ({Maintainer}) v{Version} is loaded.", plugin.Name, plugin.Maintainer,
         plugin.Version);
     Log.Information("Plugin type: {Type}", plugin.Instance.PluginType());
-    Log.Information("Responsible for {IDs}", plugin.Instance.ResponsibleForContentIds());
+
+    if (plugin.Instance.PluginType() == EPluginType.ContentSpecific)
+        Log.Information("Responsible for {IDs}", plugin.Instance.ResponsibleForContentIds());
 }
 
 if (Blocklist.Blocks.Count == 0) Log.Information("No blocklist has been loaded, is this intentional?");
