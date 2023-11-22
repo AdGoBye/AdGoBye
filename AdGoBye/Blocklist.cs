@@ -59,10 +59,17 @@ public static class Blocklist
         var files = Directory.GetFiles("./Blocklists");
         foreach (var file in files)
         {
-            var blocklist = Toml.ToModel<BlocklistModel>(File.ReadAllText(file));
-            Log.Information("Read blocklist: {Name} ({Maintainer})", blocklist.Title,
-                blocklist.Maintainer);
-            final.Add(blocklist);
+            try
+            {
+                var blocklist = Toml.ToModel<BlocklistModel>(File.ReadAllText(file));
+                Log.Information("Read blocklist: {Name} ({Maintainer})", blocklist.Title,
+                    blocklist.Maintainer);
+                final.Add(blocklist);
+            }
+            catch (TomlException exception)
+            {
+                Log.Error("Failed to parse blocklist {file}: {error}", file, exception.Message);
+            }
         }
 
         return final;
