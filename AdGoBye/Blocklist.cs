@@ -70,7 +70,7 @@ public static class Blocklist
 
     /// <summary>
     /// <para>
-    /// <c>BlocklistsParser</c> converts the <c>BlacklistModel</c>s usually received from file blocklists and turns it
+    /// <c>BlocklistsParser</c> converts the <c>BlocklistModel</c>s usually received from file blocklists and turns it
     /// into a deduplicated dictionary (per <c>HashSet</c>)
     /// </para>
     /// </summary>
