@@ -3,6 +3,8 @@ using AdGoBye.Plugins;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
+using Serilog.Templates;
+using Serilog.Templates.Themes;
 
 var levelSwitch = new LoggingLevelSwitch
 {
@@ -10,7 +12,10 @@ var levelSwitch = new LoggingLevelSwitch
 };
 
 Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
-    .WriteTo.Console().CreateLogger();
+    .WriteTo.Console(new ExpressionTemplate(
+        "[{@t:HH:mm:ss} {@l:u3} {Coalesce(Substring(SourceContext, LastIndexOf(SourceContext, '.') + 1),'<none>')}] {@m}\n{@x}",
+        theme: TemplateTheme.Literate))
+    .CreateLogger();
 var logger = Log.ForContext(typeof(Program));
 
 PluginLoader.LoadPlugins();
