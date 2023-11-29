@@ -8,6 +8,7 @@ using AssetsTools.NET.Extra;
 
 public class ExamplePlugin : BasePlugin
 {
+    private static readonly ILogger Logger = Log.ForContext(typeof(ExamplePlugin));
     public override EPluginType PluginType()
     {
         return EPluginType.Global;
@@ -35,7 +36,7 @@ public class ExamplePlugin : BasePlugin
                 var parentGameObjectInfo = manager.GetBaseField(assetFileInstance, parentGameObject);
                 
                 if (parentGameObjectInfo["m_IsActive"].AsBool is false) continue;
-                Log.Verbose("Found chair on '{name}' [{PathID}], disabling", parentGameObjectInfo["m_Name"].AsString, parentGameObject.PathId);
+                Logger.Verbose("Found chair on '{name}' [{PathID}], disabling", parentGameObjectInfo["m_Name"].AsString, parentGameObject.PathId);
                 
                 parentGameObjectInfo["m_IsActive"].AsBool = false;
                 parentGameObject.SetNewData(parentGameObjectInfo);
@@ -46,11 +47,11 @@ public class ExamplePlugin : BasePlugin
 
             if (!foundOneChair)
             {
-                Log.Verbose("Skipping, no chairs found");
+                Logger.Verbose("Skipping, no chairs found");
                 return EPatchResult.Skipped;
             }
             
-            Log.Verbose("Writing changes to bundle");
+            Logger.Verbose("Writing changes to bundle");
             bundle.BlockAndDirInfo.DirectoryInfos[1].SetNewData(assetsFile);
             using var writer = new AssetsFileWriter(dataLocation + ".mod");
             bundle.Write(writer);

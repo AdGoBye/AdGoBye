@@ -14,7 +14,7 @@ public static class Blocklist
 {
     private static readonly AssetsManager Manager = new();
     public static Dictionary<string, HashSet<GameObjectInstance>> Blocks;
-    private static readonly ILogger Logger = Log.ForContext<Indexer>();
+    private static readonly ILogger Logger = Log.ForContext(typeof(Blocklist));
 
     static Blocklist()
     {
@@ -62,13 +62,13 @@ public static class Blocklist
             try
             {
                 var blocklist = Toml.ToModel<BlocklistModel>(File.ReadAllText(file));
-                Log.Information("Read blocklist: {Name} ({Maintainer})", blocklist.Title,
+                Logger.Information("Read blocklist: {Name} ({Maintainer})", blocklist.Title,
                     blocklist.Maintainer);
                 final.Add(blocklist);
             }
             catch (TomlException exception)
             {
-                Log.Error("Failed to parse blocklist {file}: {error}", file, exception.Message);
+                Logger.Error("Failed to parse blocklist {file}: {error}", file, exception.Message);
             }
         }
 

@@ -30,6 +30,7 @@ public record struct IndexSerializationRoot
 
 public class Indexer
 {
+    private static readonly ILogger Logger = Log.ForContext(typeof(Indexer));
     public static readonly string WorkingDirectory = GetWorkingDirectory();
     public static readonly List<Content> Index = PopulateIndex();
     private static readonly JsonSerializerOptions JsonSerializerOptions = new() { IncludeFields = true };
@@ -50,7 +51,7 @@ public class Indexer
             }
         }
 
-        Log.Information("Index is stale, regenerating...");
+        Logger.Information("Index is stale, regenerating...");
         return GenerateIndexContents(directoryIndex);
 
         List<Content> RemoveAllowlistItems(List<Content> diskCache)
@@ -72,16 +73,16 @@ public class Indexer
         var contentList = new List<Content>();
         Parallel.ForEach(directoryIndex, directory =>
         {
-            Log.Verbose("Loading {directory}", directory);
+            Logger.Verbose("Loading {directory}", directory);
             var content = ParseFile(directory + "/__data");
             if (content == null) return;
             if (Settings.Options.Allowlist is not null && Settings.Options.Allowlist.Contains(content.Id))
             {
-                Log.Information("Skipped {id} for indexation in accordance with Allowlist", content.Id);
+                Logger.Information("Skipped {id} for indexation in accordance with Allowlist", content.Id);
                 return;
             }
 
-            Log.Verbose("Adding to index: {id} ({type})", content.Id, content.Type);
+            Logger.Verbose("Adding to index: {id} ({type})", content.Id, content.Type);
             contentList.Add(content);
         });
 
@@ -98,7 +99,7 @@ public class Indexer
             IndexContent = Index
         }, JsonSerializerOptions);
         File.WriteAllText("cache.json", serialized);
-        Log.Verbose("Wrote cache file to disk");
+        Logger.Verbose("Wrote cache file to disk");
     }
 
     private static string GetCurrentDirectoryHash()
@@ -117,7 +118,7 @@ public class Indexer
             IndexContent = contentList
         }, JsonSerializerOptions);
         File.WriteAllText("cache.json", serialized);
-        Log.Verbose("Wrote cache file to disk");
+        Logger.Verbose("Wrote cache file to disk");
     }
 
     private static string DirectoryIndexToHash(IEnumerable<string> directories)
@@ -216,8 +217,8 @@ public class Indexer
 
         void DieFatally(Exception e)
         {
-            Log.Fatal("We're unable to find your game's working folder (the folder above the cache), " +
-                      "please provide it manually in appsettings.json as 'WorkingFolder'.");
+            Logger.Fatal("We're unable to find your game's working folder (the folder above the cache), " +
+                         "please provide it manually in appsettings.json as 'WorkingFolder'.");
             throw e;
         }
     }
@@ -240,7 +241,7 @@ public class Indexer
         catch (NotImplementedException e)
         {
             if (e.Message != "Cannot handle bundles with multiple block sizes yet.") throw;
-            Log.Warning(
+            Logger.Warning(
                 "{directory} has multiple block sizes, AssetsTools can't handle this yet. Skipping... ",
                 directory);
             return null;
@@ -264,7 +265,7 @@ public class Indexer
 
         if (assetInstance is null)
         {
-            Log.Warning(
+            Logger.Warning(
                 $"Indexing {directory} caused no loadable bundle directory to exist, is this bundle valid?",
                 directory);
             return null;
@@ -286,13 +287,13 @@ public class Indexer
 
         if (id == "")
         {
-            Log.Warning("{directory} has no embedded ID for some reason, skipping this…", directory);
+            Logger.Warning("{directory} has no embedded ID for some reason, skipping this…", directory);
             return null;
         }
 
         if (type >= 3)
         {
-            Log.Warning(
+            Logger.Warning(
                 "{directory} is neither Avatar nor World but another secret other thing ({type}), skipping this...",
                 directory, type);
             return null;
@@ -309,7 +310,7 @@ public class Indexer
 
     public static void PatchContent(Content content)
     {
-        Log.Information("Patching {ID} ({path})", content.Id, content.Path);
+        Logger.Information("Patching {ID} ({path})", content.Id, content.Path);
         foreach (var plugin in PluginLoader.LoadedPlugins)
         {
             var pluginApplies = plugin.Instance.PluginType() == EPluginType.Global;
@@ -325,7 +326,7 @@ public class Indexer
         // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract - False positive
         if (Blocklist.Blocks is null) return;
         foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
-        { 
+        {
             Blocklist.Patch(content.Path, block.Value.ToArray());
         }
     }

@@ -7,6 +7,7 @@ namespace AdGoBye;
 
 public static class PluginLoader
 {
+    private static readonly ILogger Logger = Log.ForContext(typeof(PluginLoader));
     public static List<PluginEntry> LoadedPlugins = new();
 
     public static void LoadPlugins()
@@ -50,7 +51,7 @@ public static class PluginLoader
         }
         catch (Exception e)
         {
-            Log.Error("Plugin {path} failed to load with error: {error}", pluginPath, e);
+            Logger.Error("Plugin {path} failed to load with error: {error}", pluginPath, e);
             return;
         }
 
@@ -80,7 +81,7 @@ public static class PluginLoader
         if (string.IsNullOrEmpty(pluginName) || string.IsNullOrEmpty(pluginVersion) ||
             pluginClass == null)
         {
-            Log.Error("Plugin {path} failed to load as it was missing a name, version or class.", pluginPath);
+            Logger.Error("Plugin {path} failed to load as it was missing a name, version or class.", pluginPath);
             return;
         }
 

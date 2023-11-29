@@ -6,6 +6,7 @@ namespace AdGoBye;
 
 public static class Live
 {
+    private static readonly ILogger Logger = Log.ForContext(typeof(Live));
     private static readonly EventWaitHandle Ewh = new(true, EventResetMode.ManualReset);
     private const string LoadStartIndicator = "[Behaviour] Preparing assets...";
     private const string LoadStopIndicator = "Loaded asset bundle";
@@ -31,7 +32,7 @@ public static class Live
         watcher.Created += (_, e) => Task.Run(() => ParseFile(e.FullPath.Replace("__info", "__data")));
         watcher.Error += (_, e) =>
         {
-            Log.Error("{source}: {exception}", e.GetException().Message, e.GetException().Message);
+            Logger.Error("{source}: {exception}", e.GetException().Message, e.GetException().Message);
         };
 
         watcher.Filter = "__info";
@@ -44,7 +45,7 @@ public static class Live
     }
     private static async void ParseFile(string path)
     {
-        Log.Verbose("File creation: {directory}", path);
+        Logger.Verbose("File creation: {directory}", path);
         var done = false;
         while (!done)
         {
@@ -53,18 +54,18 @@ public static class Live
                 var content = Indexer.ParseFile(path);
                 if (content is null)
                 {
-                    Log.Debug("{path} was null", path);
+                    Logger.Debug("{path} was null", path);
                     return;
                 }
 
                 Indexer.Index.Add(content);
-                Log.Information("Adding to index: {id} ({type})", content.Id, content.Type);
+                Logger.Information("Adding to index: {id} ({type})", content.Id, content.Type);
 
                 if (content.Type == ContentType.World && Blocklist.Blocks is not null)
                 {
                     if (Blocklist.Blocks.ContainsKey(content.Id))
                     {
-                        Log.Verbose("Live patching world after lock is released… ({id})", content.Id);
+                        Logger.Verbose("Live patching world after lock is released… ({id})", content.Id);
                         // Unity doesn't hold a lock on the file.
                         // If we attempt to patch the file during load, we may overwrite the file while
                         // the client loading the world, causing corruption and the client to crash.
@@ -96,7 +97,7 @@ public static class Live
         {
             if (GetNewestLog() != currentLogFile)
             {
-                Log.Verbose("Switching file, new log file exists");
+                Logger.Verbose("Switching file, new log file exists");
                 currentLogFile = GetNewestLog();
                 sr = GetLogStream(currentLogFile);
 
@@ -114,12 +115,12 @@ public static class Live
 
             if (s.Contains(LoadStartIndicator))
             {
-                Log.Verbose("Expecting world load: {msg}", s);
+                Logger.Verbose("Expecting world load: {msg}", s);
                 Ewh.Reset();
             }
             else if (s.Contains(LoadStopIndicator))
             {
-                Log.Verbose("Expecting world load finish: {msg}", s);
+                Logger.Verbose("Expecting world load finish: {msg}", s);
                 Ewh.Set();
             }
         }
