@@ -44,6 +44,7 @@ if (Settings.Options.EnableLive)
 {
     Task.Run(() => Live.WatchNewContent(Indexer.WorkingDirectory));
     Task.Run(Live.ParseLogLock);
+    Task.Run(Live.SaveCachePeriodically);
     await Task.Delay(Timeout.Infinite).ConfigureAwait(false);
 }
 #pragma warning restore CS4014

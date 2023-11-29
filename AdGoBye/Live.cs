@@ -83,15 +83,18 @@ public static class Live
         }
     }
 
+    public static void SaveCachePeriodically()
+    {
+        var timer = new System.Timers.Timer(300000);
+        timer.Elapsed += (_, _) => Indexer.WriteIndexToDisk();
+        timer.AutoReset = true;
+        timer.Enabled = true;
+    }
+    
     public static void ParseLogLock()
     {
         var currentLogFile = GetNewestLog();
         var sr = GetLogStream(currentLogFile);
-
-        var timer = new System.Timers.Timer(60000);
-        timer.Elapsed += (_, _) => Indexer.WriteIndexToDisk();
-        timer.AutoReset = true;
-        timer.Enabled = true;
 
         while (true)
         {
