@@ -9,8 +9,8 @@ var levelSwitch = new LoggingLevelSwitch
     MinimumLevel = (LogEventLevel)Settings.Options.LogLevel
 };
 
-Log.Logger = new LoggerConfiguration().MinimumLevel.Verbose()
-    .WriteTo.Console(levelSwitch: levelSwitch).CreateLogger();
+Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
+    .WriteTo.Console().CreateLogger();
 
 PluginLoader.LoadPlugins();
 foreach (var plugin in PluginLoader.LoadedPlugins)
