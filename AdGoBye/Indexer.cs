@@ -309,6 +309,7 @@ public class Indexer
 
     public static void PatchContent(Content content)
     {
+        Log.Information("Patching {ID} ({path})", content.Id, content.Path);
         foreach (var plugin in PluginLoader.LoadedPlugins)
         {
             var pluginApplies = plugin.Instance.PluginType() == EPluginType.Global;
@@ -324,8 +325,7 @@ public class Indexer
         // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract - False positive
         if (Blocklist.Blocks is null) return;
         foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
-        {
-            Log.Information("Patching {ID} ({path})", content.Id, content.Path);
+        { 
             Blocklist.Patch(content.Path, block.Value.ToArray());
         }
     }
