@@ -1,4 +1,5 @@
 ﻿using AdGoBye.Plugins;
+using Serilog;
 
 namespace AdGoBye.ExamplePlugin;
 
@@ -33,6 +34,8 @@ public class ExamplePlugin : BasePlugin
                 var parentGameObject = assetsFile.GetAssetInfo(monoBehaviourInfo["m_GameObject.m_PathID"].AsLong);
                 var parentGameObjectInfo = manager.GetBaseField(assetFileInstance, parentGameObject);
                 
+                Log.Verbose("Found chair on '{name}' [{PathID}], disabling", parentGameObjectInfo["m_Name"].AsString, parentGameObject.PathId);
+                
                 parentGameObjectInfo["m_IsActive"].AsBool = false;
                 parentGameObject.SetNewData(parentGameObjectInfo);
 
@@ -42,10 +45,11 @@ public class ExamplePlugin : BasePlugin
 
             if (!foundOneChair)
             {
-                Console.WriteLine("Skipping, no chairs found");
+                Log.Verbose("Skipping, no chairs found");
                 return EPatchResult.Skipped;
             }
             
+            Log.Verbose("Writing changes to bundle");
             bundle.BlockAndDirInfo.DirectoryInfos[1].SetNewData(assetsFile);
             using var writer = new AssetsFileWriter(dataLocation + ".mod");
             bundle.Write(writer);
