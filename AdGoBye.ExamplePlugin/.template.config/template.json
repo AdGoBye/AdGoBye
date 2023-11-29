@@ -1,0 +1,12 @@
+{
+  "author": "AGB",
+  "name": "Example Plugin Base",
+  "description": "A simple project that disables chairs using AssetsTools.NET you can use as starting off point for AGB Plugin development.",
+  "identity": "AGB.ExamplePlugin.1.0",
+  "shortName": "exampleplugin",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "ExamplePlugin"
+}
