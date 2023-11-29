@@ -34,6 +34,7 @@ public class ExamplePlugin : BasePlugin
                 var parentGameObject = assetsFile.GetAssetInfo(monoBehaviourInfo["m_GameObject.m_PathID"].AsLong);
                 var parentGameObjectInfo = manager.GetBaseField(assetFileInstance, parentGameObject);
                 
+                if (parentGameObjectInfo["m_IsActive"].AsBool is false) continue;
                 Log.Verbose("Found chair on '{name}' [{PathID}], disabling", parentGameObjectInfo["m_Name"].AsString, parentGameObject.PathId);
                 
                 parentGameObjectInfo["m_IsActive"].AsBool = false;
