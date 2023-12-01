@@ -6,6 +6,7 @@ using AdGoBye.Plugins;
 using AssetsTools.NET.Extra;
 using Microsoft.Win32;
 using Serilog;
+using System.IO;
 
 namespace AdGoBye;
 
@@ -74,6 +75,7 @@ public class Indexer
         Parallel.ForEach(directoryIndex, directory =>
         {
             Logger.Verbose("Loading {directory}", directory);
+            if (!File.Exists(directory + "/__data")) return;
             var content = ParseFile(directory + "/__data");
             if (content == null) return;
             if (Settings.Options.Allowlist is not null && Settings.Options.Allowlist.Contains(content.Id))
