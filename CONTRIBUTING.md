@@ -10,7 +10,7 @@ across Linux and Windows.
 ## Terminology
 
 **_Do not mention the game by name anywhere here._**
-Instead, use terms like `Client` & `Game` (the thing to play the game), `Server` & `API` or `Service Provider` (the entity).
+Instead, use terms like `Client` & `Game` (the thing to play the game), `Server` & `API`, or `Service Provider` (the entity).
 
 We use terms such as Allowlist and Blocklist over "Whitelist" / "Blacklist", they are easier to
 enumerate (`Blocklist -> Block -> Blocks` vs `Blacklist -> Black -> Blacks`) and more inclusive.
@@ -39,10 +39,10 @@ And your blocklist is like this:
 game_objects = [{ name = "Cube" }]
 ```
 
-AGB will disable all gameobjects named `Cube`.
+AGB will disable all GameObjects named `Cube`.
 This can be desirable if an Object has a specific name repeated across the world.
 
-Although if the name is as generic as `Cube`, you might end up disabling other objects that could be important without
+However, if the name is as generic as `Cube`, you might end up disabling other objects that could be important without
 intending to, such as geometry. **Don't excessively disable objects.**
 
 The Blocklist component gives you two fields to mitigate this, you can match to the Object's Position and Parent (
@@ -75,7 +75,7 @@ game_objects = [
 Note that we don't resolve a nested parent, so if you do something like this:
 
 ```toml
-# Cube3 has no effect here because it's nested in parent.
+# Cube3 has no effect here because it's nested in the parent.
 game_objects = [
     { name = "Cube3", parent = { name = "Cube2", parent = { name = "Cube3" } } }
 ]
@@ -90,7 +90,7 @@ Certain objects exist in worlds to control logic, for example, controlling and r
 ***DO NOT, UNDER ANY CIRCUMSTANCE, DISABLE GAME LOGIC.
 IF YOUR BLOCKLIST CAUSES FUNDAMENTAL WORLD BREAKAGE, NO BLOCK IS PREFERRED.***
 
-This is informed from the arguments against modding before the EAC days. Creators were complaining that mods would
+This is informed by the arguments against modding before the EAC days. Creators were complaining that mods would
 disrupt worlds and require them to diagnose those issues.
 
 ## Use only one table format
@@ -133,7 +133,7 @@ name = "2"
 ```
 
 ```toml
-# This will error due to being counted as re-assign.
+# This will error due to being counted as a re-assign.
 title = "Example"
 description = ""
 maintainer = ""
@@ -149,7 +149,7 @@ world_id = "wrld_00000000-0000-0000-0000-000000000000"
 game_objects = { name = "1" }
 ```
 
-In AGB core blocklists, we use [inline table](https://toml.io/en/v1.0.0#inline-table) with linebreaks intentionally
+In AGB core blocklists, we use an [inline table](https://toml.io/en/v1.0.0#inline-table) with linebreaks intentionally
 *against the recommendations of the TOML specification.*
 If you maintain your own list, you are free to choose whatever suits you as long as you do not mix them.
 
@@ -180,9 +180,9 @@ while it's in transit. If you attempt to edit something *while* it's being loade
 This means if you try to use blocklists for something like anti-crashing, you will need to load the offending avatar
 at least once, so it can get saved to disk before AGB can block it.
 That limitation is fine for worlds, but this won't work if loading the avatar might crash your game.
-Even then, we match using IDs, so if the avatar gets ripped or reuploaded, the block won't work.
+Even then, we match using IDs, so if the avatar gets ripped or re-uploaded, the block won't work.
 
-But please don't this either way:
+But please don't do this either way:
 Often when you see someone, you don't say `That's Regalia's Avatar`, you say `That's Regalia` (
 see [Identity, Gender, and VRChat](https://youtu.be/5v_Dl7i4Bcw)).
 Avatars are personal to people because you inhabit and exist within an avatar, they are direct representations of
@@ -192,7 +192,7 @@ themselves.
 That is misguided at best and dangerously controlling at worst.
 
 The game has way better tools to prevent disruptive avatars or users (by using restrictive settings, hiding
-avatars, blocking someone, group moderators or calling a vote kick).
+avatars, blocking someone, group moderators, or calling a vote kick).
 
 Avatars are an incredibly sensitive and intimate topic for people since they're a form of free self-expression.
 
