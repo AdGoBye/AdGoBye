@@ -3,7 +3,7 @@
 ## Rationale
 
 Over the years, advertisements have slowly snuck their way into worlds at a pace that we haven't ever seen
-before. Creators of worlds are handed silly sums of money. This would be fine, advertisements however, slowly reached an
+before. Creators of worlds are handed silly sums of money. This would be fine, advertisements, however, slowly reached an
 excessive amount.
 
 ![img.png](Marketing%2Fimg.png)
@@ -11,7 +11,7 @@ No offense to the creator of Movie & Chill, but almost every wall has at least o
 
 ## Architecture
 
-AGB works by modifying AssetBundles in the Cache folder, the GameObjects in Worlds have known names which remain
+AGB works by modifying AssetBundles in the Cache folder, the GameObjects in Worlds have known names that remain
 mostly static, therefore, we can either remove or disable them.
 
 AGB has two methods for this: Blocklists and Plugins
@@ -23,7 +23,7 @@ We want to give users the choice of what to hide by borrowing a mechanism simila
 Blocklists contain the World IDs (`wrld_*`) with the names of GameObjects to disable, AGB then disables these
 objects.
 
-We will provide first-party blocklists (which are entirely opinionated from the AGB authors), but we allow users to
+We will provide first-party blocklists (which are entirely opinionated by the AGB authors), but we allow users to
 load their own blocklists instead.
 
 ### Plugins
@@ -39,7 +39,7 @@ code.
 
 AGB is developed out of love and out of fear.
 Worlds are special,
-they are places you develop some of your fondest memories in and push the boundaries of the technology we have today.
+they are places where you develop some of your fondest memories and push the boundaries of the technology we have today.
 
 But over the recent months, there has been an obvious culture shift.
 We've observed the ads getting more and more obtrusive.
@@ -51,7 +51,7 @@ There is seemingly no end to this wave of ads. In fact, their proliferation seem
 Names like Flirtual and Nevermet get away with no repercussions for preying on the socially awkward.
 ![Two advertisements for Flirtual and Nevermet that market themselves for making friends](Marketing/datingads.png)
 
-During the EAC mod purge, it was justified that external tooling like mods impede the vision of world creators.
+During the EAC mod purge, it was justified that external tooling like mods impedes the vision of world creators.
 While that is valid to a degree, the question is where this ends:
 
 [rainyrooftop_nevermet.webm](https://github.com/AdGoBye/AdGoBye/assets/126194895/cea32092-e58c-460c-bd55-e8a4db05f635)
@@ -60,7 +60,7 @@ While that is valid to a degree, the question is where this ends:
 
 <Sub>this guy must have startled everybody at least once</sub>
 
-While these ads may fund the creator, they come at the determent of the users who actually inhabit the world.
+While these ads may fund the creator, they come to the detriment of the users who actually inhabit the world.
 
 AdGoBye allows those who are interested in taking back their virtual reality real estate to do so.
 
@@ -76,8 +76,8 @@ The difference is that users like me, who are overstimulated by ads,
 who don't have the expendable income to spend on the products shown,
 who have no interest in the products will have a better experience in your world.
 
-Forcing advertisements onto the people who don't want them will sour their experience with the world
-you have spent your hard time working on, it's not for the mutual benefit for both of us.
+Forcing advertisements onto people who don't want them will sour their experience with the world
+you have spent your hard time working on, it's not for the mutual benefit of both of us.
 
 And if a user wants to see your world as-is, they can use the Allowlist feature provided which will skip your world
 based on ID from being indexed.
