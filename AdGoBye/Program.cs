@@ -29,7 +29,7 @@ foreach (var plugin in PluginLoader.LoadedPlugins)
         logger.Information("Responsible for {IDs}", plugin.Instance.ResponsibleForContentIds());
 }
 
-if (Blocklist.Blocks.Count == 0) Log.Information("No blocklist has been loaded, is this intentional?");
+if (Blocklist.Blocks.Count == 0) logger.Information("No blocklist has been loaded, is this intentional?");
 logger.Information("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
     Blocklist.Blocks.Count, Indexer.Index.Count);
 
