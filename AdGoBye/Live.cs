@@ -9,7 +9,7 @@ public static class Live
     private static readonly ILogger Logger = Log.ForContext(typeof(Live));
     private static readonly EventWaitHandle Ewh = new(true, EventResetMode.ManualReset);
     private const string LoadStartIndicator = "[Behaviour] Preparing assets...";
-    private const string LoadStopIndicator = "Loaded asset bundle";
+    private const string LoadStopIndicator = "Entering world";
 
     public static void WatchNewContent(string path)
     {
