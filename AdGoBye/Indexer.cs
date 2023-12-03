@@ -6,7 +6,6 @@ using AdGoBye.Plugins;
 using AssetsTools.NET.Extra;
 using Microsoft.Win32;
 using Serilog;
-using System.IO;
 
 namespace AdGoBye;
 
@@ -74,17 +73,22 @@ public class Indexer
         var contentList = new List<Content>();
         Parallel.ForEach(directoryIndex, directory =>
         {
-            Logger.Verbose("Loading {directory}", directory);
+            // Hack: Using the shared ILogger Logger causes the Parallel.ForEach to never complete
+            //       As workaround, we're giving it its own ILogger which should be identical for the user
+            //       And preserves the same context. Isn't ILogger thread safe?
+            var threadLogger = Log.ForContext(typeof(Indexer));
+            
+            threadLogger.Verbose("Loading {directory}", directory);
             if (!File.Exists(directory + "/__data")) return;
             var content = ParseFile(directory + "/__data");
             if (content == null) return;
             if (Settings.Options.Allowlist is not null && Settings.Options.Allowlist.Contains(content.Id))
             {
-                Logger.Information("Skipped {id} for indexation in accordance with Allowlist", content.Id);
+                threadLogger.Information("Skipped {id} for indexation in accordance with Allowlist", content.Id);
                 return;
             }
 
-            Logger.Verbose("Adding to index: {id} ({type})", content.Id, content.Type);
+            threadLogger.Verbose("Adding to index: {id} ({type})", content.Id, content.Type);
             contentList.Add(content);
         });
 
