@@ -43,6 +43,7 @@ public static class Live
             watcher.WaitForChanged(WatcherChangeTypes.Created, Timeout.Infinite);
         }
     }
+
     private static async void ParseFile(string path)
     {
         Logger.Verbose("File creation: {directory}", path);
@@ -61,17 +62,14 @@ public static class Live
                 Indexer.Index.Add(content);
                 Logger.Information("Adding to index: {id} ({type})", content.Id, content.Type);
 
-                if (content.Type == ContentType.World && Blocklist.Blocks is not null)
+                if (content.Type is ContentType.World)
                 {
-                    if (Blocklist.Blocks.ContainsKey(content.Id))
-                    {
-                        Logger.Verbose("Live patching world after lock is released… ({id})", content.Id);
-                        // Unity doesn't hold a lock on the file.
-                        // If we attempt to patch the file during load, we may overwrite the file while
-                        // the client loading the world, causing corruption and the client to crash.
-                        Ewh.WaitOne();
-                        Indexer.PatchContent(content);
-                    }
+                    Logger.Verbose("Live patching world after lock is released… ({id})", content.Id);
+                    // Unity doesn't hold a lock on the file.
+                    // If we attempt to patch the file during load, we may overwrite the file while
+                    // the client loading the world, causing corruption and the client to crash.
+                    Ewh.WaitOne();
+                    Indexer.PatchContent(content);
                 }
 
                 done = true;
@@ -90,7 +88,7 @@ public static class Live
         timer.AutoReset = true;
         timer.Enabled = true;
     }
-    
+
     public static void ParseLogLock()
     {
         var currentLogFile = GetNewestLog();

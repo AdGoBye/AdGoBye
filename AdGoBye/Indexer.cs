@@ -316,7 +316,7 @@ public class Indexer
 
     public static void PatchContent(Content content)
     {
-        Logger.Information("Patching {ID} ({path})", content.Id, content.Path);
+        Logger.Information("Processing {ID} ({path})", content.Id, content.Path);
         foreach (var plugin in PluginLoader.LoadedPlugins)
         {
             var pluginApplies = plugin.Instance.PluginType() == EPluginType.Global;
