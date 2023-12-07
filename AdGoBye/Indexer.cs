@@ -19,7 +19,13 @@ public record Content
 {
     public required string Id { get; init; }
     public required ContentType Type { get; init; }
-    public required string Path { get; init; }
+    public required Dictionary<int, ContentVersionMeta> VersionMeta { get; init; }
+
+    public struct ContentVersionMeta
+    {
+        public required string Path;
+        public List<string> PatchedBy;
+    }
 }
 
 public record struct IndexSerializationRoot
@@ -39,17 +45,17 @@ public class Indexer
     {
         var directoryIndex = GetDirIndex(GetCacheDir());
 
-        if (File.Exists("cache.json"))
-        {
-            var diskCache = JsonSerializer.Deserialize<IndexSerializationRoot>(File.ReadAllText("cache.json"));
-            if (GetCurrentDirectoryHash() == diskCache.Hash)
-            {
-                if (Settings.Options.Allowlist is null) return diskCache.IndexContent;
-                var sanitizedList = RemoveAllowlistItems(diskCache.IndexContent);
-                WriteIndexToDisk(sanitizedList);
-                return sanitizedList;
-            }
-        }
+        // if (File.Exists("cache.json"))
+        // {
+        //     var diskCache = JsonSerializer.Deserialize<IndexSerializationRoot>(File.ReadAllText("cache.json"));
+        //     if (GetCurrentDirectoryHash() == diskCache.Hash)
+        //     {
+        //         if (Settings.Options.Allowlist is null) return diskCache.IndexContent;
+        //         var sanitizedList = RemoveAllowlistItems(diskCache.IndexContent);
+        //         WriteIndexToDisk(sanitizedList);
+        //         return sanitizedList;
+        //     }
+        // }
 
         Logger.Information("Index is stale, regenerating...");
         return GenerateIndexContents(directoryIndex);
@@ -68,7 +74,15 @@ public class Indexer
         }
     }
 
-    private static List<Content> GenerateIndexContents(IEnumerable<string> directoryIndex)
+    private static int GetVersion(string hexVersion)
+    {
+        var hex = hexVersion.TrimStart('0');
+        if (hex.Length % 2 != 0) hex = '0' + hex;
+        var bytes = Convert.FromHexString(hex);
+        return BitConverter.ToInt32(bytes);
+    }
+
+    private static List<Content> GenerateIndexContents(Dictionary<string, List<DirectoryInfo>> directoryIndex)
     {
         var contentList = new List<Content>();
         Parallel.ForEach(directoryIndex, directory =>
@@ -77,10 +91,9 @@ public class Indexer
             //       As workaround, we're giving it its own ILogger which should be identical for the user
             //       And preserves the same context. Isn't ILogger thread safe?
             var threadLogger = Log.ForContext(typeof(Indexer));
-            
+
             threadLogger.Verbose("Loading {directory}", directory);
-            if (!File.Exists(directory + "/__data")) return;
-            var content = ParseFile(directory + "/__data");
+            var content = ParseFile(directory.Value);
             if (content == null) return;
             if (Settings.Options.Allowlist is not null && Settings.Options.Allowlist.Contains(content.Id))
             {
@@ -111,7 +124,7 @@ public class Indexer
     private static string GetCurrentDirectoryHash()
     {
         var directoryIndex = GetDirIndex(GetCacheDir());
-        var currentHash = DirectoryIndexToHash(directoryIndex);
+        var currentHash = DirectoryIndexToHash(Array.Empty<string>());
         return currentHash;
     }
 
@@ -133,33 +146,20 @@ public class Indexer
         return System.Text.Encoding.UTF8.GetString(SHA256.HashData(directoryString));
     }
 
-    private static List<string> GetDirIndex(string vrcCacheDir)
+    private static Dictionary<string, List<DirectoryInfo>> GetDirIndex(string vrcCacheDir)
     {
         // The file structure of Cache is roughly like this:
         //   - Folder (\w{16}) [We have this]
         //       - Folder (0{24}\w{8}) [We want path of this, don't know random name though]
         //          - __info
         //          - __data
-        //          - __lock (if currently used, not actually filesystem file locked)
+        //          - __lock (if currently used)
 
-        var dirs = new List<string>();
-        foreach (var dir in new DirectoryInfo(vrcCacheDir).GetDirectories("*", SearchOption.TopDirectoryOnly))
-        {
-            var subDirs = dir.GetDirectories();
-            switch (subDirs.Length)
-            {
-                case 0:
-                    continue;
-                case 1:
-                    dirs.Add(subDirs[0].FullName);
-                    continue;
-                default:
-                    dirs.Add(subDirs.OrderByDescending(directory => directory.CreationTimeUtc).First().FullName);
-                    break;
-            }
-        }
+        var dirs = new DirectoryInfo(vrcCacheDir).GetDirectories("*", SearchOption.AllDirectories)
+            .Where(info => info.Parent is { Name: not "Cache-WindowsPlayer" });
 
-        return dirs;
+        return dirs.GroupBy(info => info.Parent!.Name)
+            .ToDictionary(versions => versions.Key, versions => versions.ToList());
     }
 
     [SuppressMessage("ReSharper", "StringLiteralTypo")]
@@ -235,88 +235,99 @@ public class Indexer
     }
 
 
-    public static Content? ParseFile(string directory)
+    public static Content? ParseFile(List<DirectoryInfo> directories)
     {
-        AssetsManager manager = new();
-        BundleFileInstance bundleInstance;
+        string? id = null;
+        int? type = null;
 
-        try
+        foreach (var version in directories)
         {
-            bundleInstance = manager.LoadBundleFile(directory);
-        }
-        catch (NotImplementedException e)
-        {
-            if (e.Message != "Cannot handle bundles with multiple block sizes yet.") throw;
-            Logger.Warning(
-                "{directory} has multiple block sizes, AssetsTools can't handle this yet. Skipping... ",
-                directory);
-            return null;
-        }
+            AssetsManager manager = new();
+            BundleFileInstance bundleInstance;
 
-
-        var bundle = bundleInstance!.file;
-
-        var index = 0;
-        AssetsFileInstance? assetInstance = null;
-        foreach (var bundleDirectoryInfo in bundle.BlockAndDirInfo.DirectoryInfos)
-        {
-            if (bundleDirectoryInfo.Name.EndsWith(".sharedAssets"))
+            try
             {
-                index++;
-                continue;
+                bundleInstance = manager.LoadBundleFile(version.FullName + "/__data");
+            }
+            catch (NotImplementedException e)
+            {
+                if (e.Message != "Cannot handle bundles with multiple block sizes yet.") throw;
+                Logger.Warning(
+                    "{directory} has multiple block sizes, AssetsTools can't handle this yet. Skipping... ",
+                    directories);
+                return null;
             }
 
-            assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, index);
+
+            var bundle = bundleInstance!.file;
+
+            var index = 0;
+            AssetsFileInstance? assetInstance = null;
+            foreach (var bundleDirectoryInfo in bundle.BlockAndDirInfo.DirectoryInfos)
+            {
+                if (bundleDirectoryInfo.Name.EndsWith(".sharedAssets"))
+                {
+                    index++;
+                    continue;
+                }
+
+                assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, index);
+            }
+
+            if (assetInstance is null)
+            {
+                Logger.Warning(
+                    $"Indexing {directories} caused no loadable bundle directory to exist, is this bundle valid?",
+                    directories);
+                return null;
+            }
+
+            var assetFile = assetInstance.file;
+
+            if (id is not null && type is not null) continue;
+            foreach (var gameObjectInfo in assetFile.GetAssetsOfType(AssetClassID.MonoBehaviour))
+            {
+                var gameObjectBase = manager.GetBaseField(assetInstance, gameObjectInfo);
+                if (gameObjectBase["blueprintId"].IsDummy || gameObjectBase["contentType"].IsDummy) continue;
+
+                if (gameObjectBase["blueprintId"].AsString == "")
+                {
+                    Logger.Warning("{directory} has no embedded ID for some reason, skipping this…", directories);
+                    return null;
+                }
+
+                if (gameObjectBase["contentType"].AsInt >= 3)
+                {
+                    Logger.Warning(
+                        "{directory} is neither Avatar nor World but another secret other thing ({type}), skipping this...",
+                        directories, gameObjectBase["contentType"].AsInt);
+                    return null;
+                }
+
+                id = gameObjectBase["blueprintId"].AsString;
+                type = gameObjectBase["contentType"].AsInt;
+                break;
+            }
         }
 
-        if (assetInstance is null)
-        {
-            Logger.Warning(
-                $"Indexing {directory} caused no loadable bundle directory to exist, is this bundle valid?",
-                directory);
-            return null;
-        }
-
-        var assetFile = assetInstance.file;
-        var id = "";
-        int type = 0;
-        foreach (var gameObjectInfo in assetFile.GetAssetsOfType(AssetClassID.MonoBehaviour))
-        {
-            var gameObjectBase = manager.GetBaseField(assetInstance, gameObjectInfo);
-            if (gameObjectBase["blueprintId"].IsDummy || gameObjectBase["contentType"].IsDummy) continue;
-            id = gameObjectBase["blueprintId"].AsString;
-            if (id == "") continue;
-
-            type = gameObjectBase["contentType"].AsInt;
-            break;
-        }
-
-        if (id == "")
-        {
-            Logger.Warning("{directory} has no embedded ID for some reason, skipping this…", directory);
-            return null;
-        }
-
-        if (type >= 3)
-        {
-            Logger.Warning(
-                "{directory} is neither Avatar nor World but another secret other thing ({type}), skipping this...",
-                directory, type);
-            return null;
-        }
-
-
-        return new Content
-        {
-            Id = id,
-            Path = directory,
-            Type = (ContentType)type
-        };
+        if (id is not null && type is not null)
+            return new Content
+            {
+                Id = id,
+                Type = (ContentType)type,
+                VersionMeta = directories.ToDictionary(info => GetVersion(info.Name), info =>
+                    new Content.ContentVersionMeta
+                    {
+                        Path = info.FullName
+                    })
+            };
+        Logger.Error("Indexing {directory} has created no ID or Type", directories[0].Parent!.Name);
+        return null;
     }
 
     public static void PatchContent(Content content)
     {
-        Logger.Information("Processing {ID} ({path})", content.Id, content.Path);
+        Logger.Information("Processing {ID} ({path})", content.Id, content);
         foreach (var plugin in PluginLoader.LoadedPlugins)
         {
             var pluginApplies = plugin.Instance.PluginType() == EPluginType.Global;
@@ -326,14 +337,14 @@ public class Indexer
                 if (ctIds != null) pluginApplies = ctIds.Contains(content.Id);
             }
 
-            if (pluginApplies) plugin.Instance.Patch(content.Id, content.Path.Replace("__data", ""));
+            //if (pluginApplies) plugin.Instance.Patch(content.Id, content.Replace("__data", ""));
         }
 
         // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract - False positive
         if (Blocklist.Blocks is null) return;
         foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
         {
-            Blocklist.Patch(content.Path, block.Value.ToArray());
+            //Blocklist.Patch(content, block.Value.ToArray());
         }
     }
 }
