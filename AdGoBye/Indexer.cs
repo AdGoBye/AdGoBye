@@ -152,7 +152,7 @@ public class Indexer
         if (content.VersionMeta.PatchedBy.Contains("Blocklist")) return;
         foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
         {
-            Blocklist.Patch(content.VersionMeta.Path, block.Value.ToArray());
+            Blocklist.Patch(content.VersionMeta.Path + "/__data", block.Value.ToArray());
             content.VersionMeta.PatchedBy.Add("Blocklist");
         }
     }
