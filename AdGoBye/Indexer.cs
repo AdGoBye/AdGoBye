@@ -224,7 +224,8 @@ public class Indexer
             VersionMeta = new Content.ContentVersionMeta
             {
                 Version = GetVersion(pathToFile.Name),
-                Path = pathToFile.FullName
+                Path = pathToFile.FullName,
+                PatchedBy = new List<string>()
             },
             StableContentName = pathToFile.Parent!.Name
         };
