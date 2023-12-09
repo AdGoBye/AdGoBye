@@ -19,10 +19,12 @@ public record Content
 {
     public required string Id { get; init; }
     public required ContentType Type { get; init; }
-    public required Dictionary<int, ContentVersionMeta> VersionMeta { get; init; }
+    public required ContentVersionMeta VersionMeta { get; init; }
+    public required string StableContentName;
 
     public struct ContentVersionMeta
     {
+        public required int Version;
         public required string Path;
         public List<string> PatchedBy;
     }
@@ -39,7 +41,6 @@ public class Indexer
     private static readonly ILogger Logger = Log.ForContext(typeof(Indexer));
     public static readonly string WorkingDirectory = GetWorkingDirectory();
     public static readonly List<Content> Index = PopulateIndex();
-    private static readonly JsonSerializerOptions JsonSerializerOptions = new() { IncludeFields = true };
 
     private static List<Content> PopulateIndex()
     {
@@ -58,7 +59,7 @@ public class Indexer
         // }
 
         Logger.Information("Index is stale, regenerating...");
-        return GenerateIndexContents(directoryIndex);
+        return DirIndexToContent(directoryIndex);
 
         List<Content> RemoveAllowlistItems(List<Content> diskCache)
         {
@@ -82,7 +83,7 @@ public class Indexer
         return BitConverter.ToInt32(bytes);
     }
 
-    private static List<Content> GenerateIndexContents(Dictionary<string, List<DirectoryInfo>> directoryIndex)
+    /*private static List<Content> GenerateIndexContents(Dictionary<string, List<DirectoryInfo>> directoryIndex)
     {
         var contentList = new List<Content>();
         Parallel.ForEach(directoryIndex, directory =>
@@ -93,7 +94,7 @@ public class Indexer
             var threadLogger = Log.ForContext(typeof(Indexer));
 
             threadLogger.Verbose("Loading {directory}", directory);
-            var content = ParseFile(directory.Value);
+            var content = ParseFileMeta(directory.Value);
             if (content == null) return;
             if (Settings.Options.Allowlist is not null && Settings.Options.Allowlist.Contains(content.Id))
             {
@@ -107,44 +108,7 @@ public class Indexer
 
         WriteIndexToDisk(contentList);
         return contentList;
-    }
-
-    public static void WriteIndexToDisk()
-    {
-        var currentHash = GetCurrentDirectoryHash();
-        var serialized = JsonSerializer.Serialize(new IndexSerializationRoot
-        {
-            Hash = currentHash,
-            IndexContent = Index
-        }, JsonSerializerOptions);
-        File.WriteAllText("cache.json", serialized);
-        Logger.Verbose("Wrote cache file to disk");
-    }
-
-    private static string GetCurrentDirectoryHash()
-    {
-        var directoryIndex = GetDirIndex(GetCacheDir());
-        var currentHash = DirectoryIndexToHash(Array.Empty<string>());
-        return currentHash;
-    }
-
-    private static void WriteIndexToDisk(List<Content> contentList)
-    {
-        var currentHash = GetCurrentDirectoryHash();
-        var serialized = JsonSerializer.Serialize(new IndexSerializationRoot
-        {
-            Hash = currentHash,
-            IndexContent = contentList
-        }, JsonSerializerOptions);
-        File.WriteAllText("cache.json", serialized);
-        Logger.Verbose("Wrote cache file to disk");
-    }
-
-    private static string DirectoryIndexToHash(IEnumerable<string> directories)
-    {
-        var directoryString = System.Text.Encoding.UTF8.GetBytes(string.Join("", directories));
-        return System.Text.Encoding.UTF8.GetString(SHA256.HashData(directoryString));
-    }
+    }*/
 
     private static Dictionary<string, List<DirectoryInfo>> GetDirIndex(string vrcCacheDir)
     {
@@ -158,9 +122,122 @@ public class Indexer
         var dirs = new DirectoryInfo(vrcCacheDir).GetDirectories("*", SearchOption.AllDirectories)
             .Where(info => info.Parent is { Name: not "Cache-WindowsPlayer" });
 
-        return dirs.GroupBy(info => info.Parent!.Name)
-            .ToDictionary(versions => versions.Key, versions => versions.ToList());
+        return dirs.GroupBy(info => info.Parent!.Name).ToDictionary(info => info.Key, info => info.ToList());
     }
+
+    private static List<Content> DirIndexToContent(Dictionary<string, List<DirectoryInfo>> DirIndex)
+    {
+        var ContentList = new List<Content>();
+        foreach (var file in DirIndex)
+        {
+            var highestVersion = 0;
+            var highestVersionDir = "";
+            foreach (var directory in file.Value)
+            {
+                var version = GetVersion(directory.Name);
+                if (version < highestVersion) continue;
+                highestVersion = version;
+                highestVersionDir = directory.FullName;
+            }
+
+
+            string id;
+            int type;
+            try
+            {
+                (id, type) = ParseFileMeta(highestVersionDir)!;
+            }
+            catch (NullReferenceException) // null is a parsing issue from ParseFileMeta's side
+            {
+                continue;
+            }
+
+            ContentList.Add(new Content
+            {
+                Id = id,
+                Type = (ContentType)type,
+                VersionMeta = new Content.ContentVersionMeta
+                {
+                    Version = highestVersion,
+                    Path = highestVersionDir
+                },
+                StableContentName = file.Value[0].Parent!.Name
+            });
+        }
+
+        return ContentList;
+    }
+
+
+    public static Tuple<string, int>? ParseFileMeta(string path)
+    {
+        AssetsManager manager = new();
+        BundleFileInstance bundleInstance;
+
+        try
+        {
+            bundleInstance = manager.LoadBundleFile(path + "/__data");
+        }
+        catch (NotImplementedException e)
+        {
+            if (e.Message != "Cannot handle bundles with multiple block sizes yet.") throw;
+            Logger.Warning(
+                "{directory} has multiple block sizes, AssetsTools can't handle this yet. Skipping... ",
+                path);
+            return null;
+        }
+
+
+        var bundle = bundleInstance!.file;
+
+        var index = 0;
+        AssetsFileInstance? assetInstance = null;
+        foreach (var bundleDirectoryInfo in bundle.BlockAndDirInfo.DirectoryInfos)
+        {
+            if (bundleDirectoryInfo.Name.EndsWith(".sharedAssets"))
+            {
+                index++;
+                continue;
+            }
+
+            assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, index);
+        }
+
+        if (assetInstance is null)
+        {
+            Logger.Warning(
+                "Indexing {directory} caused no loadable bundle directory to exist, is this bundle valid?",
+                path);
+            return null;
+        }
+
+        var assetFile = assetInstance.file;
+
+        foreach (var gameObjectInfo in assetFile.GetAssetsOfType(AssetClassID.MonoBehaviour))
+        {
+            var gameObjectBase = manager.GetBaseField(assetInstance, gameObjectInfo);
+            if (gameObjectBase["blueprintId"].IsDummy || gameObjectBase["contentType"].IsDummy) continue;
+
+            if (gameObjectBase["blueprintId"].AsString == "")
+            {
+                Logger.Warning("{directory} has no embedded ID for some reason, skipping this…", path);
+                return null;
+            }
+
+            if (gameObjectBase["contentType"].AsInt >= 3)
+            {
+                Logger.Warning(
+                    "{directory} is neither Avatar nor World but another secret other thing ({type}), skipping this...",
+                    path, gameObjectBase["contentType"].AsInt);
+                return null;
+            }
+
+            return new Tuple<string, int>(gameObjectBase["blueprintId"].AsString, gameObjectBase["contentType"].AsInt);
+        }
+
+        return null;
+    }
+
 
     [SuppressMessage("ReSharper", "StringLiteralTypo")]
     private static string GetWorkingDirectory()
@@ -232,119 +309,5 @@ public class Indexer
     private static string GetCacheDir()
     {
         return WorkingDirectory + "/Cache-WindowsPlayer/";
-    }
-
-
-    public static Content? ParseFile(List<DirectoryInfo> directories)
-    {
-        string? id = null;
-        int? type = null;
-
-        foreach (var version in directories)
-        {
-            AssetsManager manager = new();
-            BundleFileInstance bundleInstance;
-
-            try
-            {
-                bundleInstance = manager.LoadBundleFile(version.FullName + "/__data");
-            }
-            catch (NotImplementedException e)
-            {
-                if (e.Message != "Cannot handle bundles with multiple block sizes yet.") throw;
-                Logger.Warning(
-                    "{directory} has multiple block sizes, AssetsTools can't handle this yet. Skipping... ",
-                    directories);
-                return null;
-            }
-
-
-            var bundle = bundleInstance!.file;
-
-            var index = 0;
-            AssetsFileInstance? assetInstance = null;
-            foreach (var bundleDirectoryInfo in bundle.BlockAndDirInfo.DirectoryInfos)
-            {
-                if (bundleDirectoryInfo.Name.EndsWith(".sharedAssets"))
-                {
-                    index++;
-                    continue;
-                }
-
-                assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, index);
-            }
-
-            if (assetInstance is null)
-            {
-                Logger.Warning(
-                    $"Indexing {directories} caused no loadable bundle directory to exist, is this bundle valid?",
-                    directories);
-                return null;
-            }
-
-            var assetFile = assetInstance.file;
-
-            if (id is not null && type is not null) continue;
-            foreach (var gameObjectInfo in assetFile.GetAssetsOfType(AssetClassID.MonoBehaviour))
-            {
-                var gameObjectBase = manager.GetBaseField(assetInstance, gameObjectInfo);
-                if (gameObjectBase["blueprintId"].IsDummy || gameObjectBase["contentType"].IsDummy) continue;
-
-                if (gameObjectBase["blueprintId"].AsString == "")
-                {
-                    Logger.Warning("{directory} has no embedded ID for some reason, skipping this…", directories);
-                    return null;
-                }
-
-                if (gameObjectBase["contentType"].AsInt >= 3)
-                {
-                    Logger.Warning(
-                        "{directory} is neither Avatar nor World but another secret other thing ({type}), skipping this...",
-                        directories, gameObjectBase["contentType"].AsInt);
-                    return null;
-                }
-
-                id = gameObjectBase["blueprintId"].AsString;
-                type = gameObjectBase["contentType"].AsInt;
-                break;
-            }
-        }
-
-        if (id is not null && type is not null)
-            return new Content
-            {
-                Id = id,
-                Type = (ContentType)type,
-                VersionMeta = directories.ToDictionary(info => GetVersion(info.Name), info =>
-                    new Content.ContentVersionMeta
-                    {
-                        Path = info.FullName
-                    })
-            };
-        Logger.Error("Indexing {directory} has created no ID or Type", directories[0].Parent!.Name);
-        return null;
-    }
-
-    public static void PatchContent(Content content)
-    {
-        Logger.Information("Processing {ID} ({path})", content.Id, content);
-        foreach (var plugin in PluginLoader.LoadedPlugins)
-        {
-            var pluginApplies = plugin.Instance.PluginType() == EPluginType.Global;
-            if (!pluginApplies && plugin.Instance.PluginType() == EPluginType.ContentSpecific)
-            {
-                var ctIds = plugin.Instance.ResponsibleForContentIds();
-                if (ctIds != null) pluginApplies = ctIds.Contains(content.Id);
-            }
-
-            //if (pluginApplies) plugin.Instance.Patch(content.Id, content.Replace("__data", ""));
-        }
-
-        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract - False positive
-        if (Blocklist.Blocks is null) return;
-        foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
-        {
-            //Blocklist.Patch(content, block.Value.ToArray());
-        }
     }
 }
