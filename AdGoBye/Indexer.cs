@@ -1,7 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Text.Json;
 using AdGoBye.Plugins;
 using AssetsTools.NET.Extra;
 using Microsoft.Win32;
@@ -19,21 +17,15 @@ public record Content
 {
     public required string Id { get; init; }
     public required ContentType Type { get; init; }
-    public required ContentVersionMeta VersionMeta { get; init; }
-    public required string StableContentName;
+    public required ContentVersionMeta VersionMeta { get; set; }
+    public required string StableContentName { get; init; }
 
     public struct ContentVersionMeta
     {
-        public required int Version;
-        public required string Path;
-        public List<string> PatchedBy;
+        public required int Version { get; set; }
+        public required string Path { get; set; }
+        public List<string> PatchedBy { get; set; }
     }
-}
-
-public record struct IndexSerializationRoot
-{
-    public string Hash { get; init; }
-    public List<Content> IndexContent { get; init; }
 }
 
 public class Indexer
@@ -41,6 +33,59 @@ public class Indexer
     private static readonly ILogger Logger = Log.ForContext(typeof(Indexer));
     public static readonly string WorkingDirectory = GetWorkingDirectory();
     public static readonly List<Content> Index = PopulateIndex();
+
+    public static void AddToIndex(string path)
+    {
+        //   - Folder (StableContentName) [singleton, we want this]
+        //       - Folder (version) [may exist multiple times] 
+        //          - __info
+        //          - __data 
+        //          - __lock (if currently used)
+        var directory = new DirectoryInfo(path);
+        if (directory.Name == "__data") directory = directory.Parent;
+
+        // If we already have an item in Index that has the same StableContentName, then this is a newer version of something Indexed
+        var indexMatch = Index.Find(content => content.StableContentName == directory!.Parent!.Parent!.Name);
+        if (indexMatch is not null)
+        {
+            var version = GetVersion(directory!.Parent!.Name);
+            if (version > indexMatch.VersionMeta.Version)
+            {
+                indexMatch.VersionMeta = new Content.ContentVersionMeta
+                    { Version = version, Path = path, PatchedBy = new List<string>() };
+            }
+            else
+            {
+                Logger.Verbose(
+                    "Skipped Indexation of {directory} since it isn't an upgrade (Index: {greaterVersion}, Parsed: {lesserVersion})",
+                    directory.FullName, indexMatch.VersionMeta.Version, version);
+                return;
+            }
+        }
+        else
+        {
+            indexMatch = FileToContent(directory!);
+            if (indexMatch is not null) Index.Add(indexMatch);
+            else return;
+        }
+
+        PatchContent(indexMatch);
+    }
+
+    public static Content? GetFromIndex(string path)
+    {
+        var directory = new DirectoryInfo(path);
+        return Index.FirstOrDefault(content => content.StableContentName == directory.Parent!.Parent!.Name);
+    }
+
+    public static void RemoveFromIndex(string path)
+    {
+        var indexMatch = GetFromIndex(path);
+        if (indexMatch is null) return;
+
+        Index.Remove(indexMatch);
+        Logger.Information("Removed {id} from Index", indexMatch.Id);
+    }
 
     private static List<Content> PopulateIndex()
     {
@@ -58,7 +103,7 @@ public class Indexer
         //     }
         // }
 
-        Logger.Information("Index is stale, regenerating...");
+        Logger.Information("Index does not exist, generating");
         return DirIndexToContent(directoryIndex);
 
         List<Content> RemoveAllowlistItems(List<Content> diskCache)
@@ -75,99 +120,115 @@ public class Indexer
         }
     }
 
-    private static int GetVersion(string hexVersion)
+    public static void PatchContent(Content content)
     {
-        var hex = hexVersion.TrimStart('0');
-        if (hex.Length % 2 != 0) hex = '0' + hex;
-        var bytes = Convert.FromHexString(hex);
-        return BitConverter.ToInt32(bytes);
-    }
+        if (content.Type is not ContentType.World) return;
 
-    /*private static List<Content> GenerateIndexContents(Dictionary<string, List<DirectoryInfo>> directoryIndex)
-    {
-        var contentList = new List<Content>();
-        Parallel.ForEach(directoryIndex, directory =>
+        var pluginOverridesBlocklist = false;
+        foreach (var plugin in PluginLoader.LoadedPlugins)
         {
-            // Hack: Using the shared ILogger Logger causes the Parallel.ForEach to never complete
-            //       As workaround, we're giving it its own ILogger which should be identical for the user
-            //       And preserves the same context. Isn't ILogger thread safe?
-            var threadLogger = Log.ForContext(typeof(Indexer));
+            if (content.VersionMeta.PatchedBy.Contains(plugin.Name)) continue;
 
-            threadLogger.Verbose("Loading {directory}", directory);
-            var content = ParseFileMeta(directory.Value);
-            if (content == null) return;
-            if (Settings.Options.Allowlist is not null && Settings.Options.Allowlist.Contains(content.Id))
+            var pluginApplies = plugin.Instance.PluginType() == EPluginType.Global;
+            if (!pluginApplies && plugin.Instance.PluginType() == EPluginType.ContentSpecific)
             {
-                threadLogger.Information("Skipped {id} for indexation in accordance with Allowlist", content.Id);
-                return;
+                var ctIds = plugin.Instance.ResponsibleForContentIds();
+                if (ctIds is not null) pluginApplies = ctIds.Contains(content.Id);
             }
 
-            threadLogger.Verbose("Adding to index: {id} ({type})", content.Id, content.Type);
-            contentList.Add(content);
-        });
+            pluginOverridesBlocklist = plugin.Instance.OverrideBlocklist(content.Id);
 
-        WriteIndexToDisk(contentList);
-        return contentList;
-    }*/
+            if (plugin.Instance.Verify(content.Id, content.VersionMeta.Path) is not EVerifyResult.Success)
+                pluginApplies = false;
+
+
+            if (pluginApplies) plugin.Instance.Patch(content.Id, content.VersionMeta.Path);
+            content.VersionMeta.PatchedBy.Add(plugin.Name);
+        }
+
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract - False positive
+        if (Blocklist.Blocks is null) return;
+        if (pluginOverridesBlocklist) return;
+        if (content.VersionMeta.PatchedBy.Contains("Blocklist")) return;
+        foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
+        {
+            Blocklist.Patch(content.VersionMeta.Path, block.Value.ToArray());
+            content.VersionMeta.PatchedBy.Add("Blocklist");
+        }
+    }
 
     private static Dictionary<string, List<DirectoryInfo>> GetDirIndex(string vrcCacheDir)
     {
-        // The file structure of Cache is roughly like this:
-        //   - Folder (\w{16}) [We have this]
-        //       - Folder (0{24}\w{8}) [We want path of this, don't know random name though]
-        //          - __info
-        //          - __data
-        //          - __lock (if currently used)
-
         var dirs = new DirectoryInfo(vrcCacheDir).GetDirectories("*", SearchOption.AllDirectories)
             .Where(info => info.Parent is { Name: not "Cache-WindowsPlayer" });
 
         return dirs.GroupBy(info => info.Parent!.Name).ToDictionary(info => info.Key, info => info.ToList());
     }
 
-    private static List<Content> DirIndexToContent(Dictionary<string, List<DirectoryInfo>> DirIndex)
+    private static List<Content> DirIndexToContent(Dictionary<string, List<DirectoryInfo>> dirIndex)
     {
-        var ContentList = new List<Content>();
-        foreach (var file in DirIndex)
-        {
-            var highestVersion = 0;
-            var highestVersionDir = "";
-            foreach (var directory in file.Value)
+        var contentList = new List<Content>();
+        Parallel.ForEach(dirIndex, file =>
             {
-                var version = GetVersion(directory.Name);
-                if (version < highestVersion) continue;
-                highestVersion = version;
-                highestVersionDir = directory.FullName;
-            }
+                var highestVersionDir = GetLatestFileVersion(file);
 
-
-            string id;
-            int type;
-            try
-            {
-                (id, type) = ParseFileMeta(highestVersionDir)!;
-            }
-            catch (NullReferenceException) // null is a parsing issue from ParseFileMeta's side
-            {
-                continue;
-            }
-
-            ContentList.Add(new Content
-            {
-                Id = id,
-                Type = (ContentType)type,
-                VersionMeta = new Content.ContentVersionMeta
+                if (highestVersionDir is null) // something is horribly wrong if this happens
                 {
-                    Version = highestVersion,
-                    Path = highestVersionDir
-                },
-                StableContentName = file.Value[0].Parent!.Name
-            });
-        }
+                    Logger.Verbose(
+                        "highestVersionDir was null for after parsing, hell might have frozen over");
+                    return;
+                }
 
-        return ContentList;
+                var parsed = FileToContent(highestVersionDir);
+                if (parsed is null) return;
+
+                contentList.Add(parsed);
+            }
+        );
+
+        return contentList;
     }
 
+    private static DirectoryInfo? GetLatestFileVersion(KeyValuePair<string, List<DirectoryInfo>> file)
+    {
+        var highestVersion = 0;
+        DirectoryInfo? highestVersionDir = null;
+        foreach (var directory in file.Value)
+        {
+            var version = GetVersion(directory.Name);
+            if (version < highestVersion) continue;
+            highestVersion = version;
+            highestVersionDir = directory;
+        }
+
+        return highestVersionDir;
+    }
+
+    private static Content? FileToContent(DirectoryInfo pathToFile)
+    {
+        string id;
+        int type;
+        try
+        {
+            (id, type) = ParseFileMeta(pathToFile.FullName)!;
+        }
+        catch (NullReferenceException) // null is a parsing issue from ParseFileMeta's side
+        {
+            return null;
+        }
+
+        return new Content
+        {
+            Id = id,
+            Type = (ContentType)type,
+            VersionMeta = new Content.ContentVersionMeta
+            {
+                Version = GetVersion(pathToFile.Name),
+                Path = pathToFile.FullName
+            },
+            StableContentName = pathToFile.Parent!.Name
+        };
+    }
 
     public static Tuple<string, int>? ParseFileMeta(string path)
     {
@@ -213,11 +274,11 @@ public class Indexer
 
         var assetFile = assetInstance.file;
 
-        foreach (var gameObjectInfo in assetFile.GetAssetsOfType(AssetClassID.MonoBehaviour))
+        foreach (var gameObjectBase in assetFile.GetAssetsOfType(AssetClassID.MonoBehaviour)
+                     .Select(gameObjectInfo => manager.GetBaseField(assetInstance, gameObjectInfo)).Where(
+                         gameObjectBase =>
+                             !gameObjectBase["blueprintId"].IsDummy && !gameObjectBase["contentType"].IsDummy))
         {
-            var gameObjectBase = manager.GetBaseField(assetInstance, gameObjectInfo);
-            if (gameObjectBase["blueprintId"].IsDummy || gameObjectBase["contentType"].IsDummy) continue;
-
             if (gameObjectBase["blueprintId"].AsString == "")
             {
                 Logger.Warning("{directory} has no embedded ID for some reason, skipping this…", path);
@@ -236,6 +297,14 @@ public class Indexer
         }
 
         return null;
+    }
+
+    private static int GetVersion(string hexVersion)
+    {
+        var hex = hexVersion.TrimStart('0');
+        if (hex.Length % 2 != 0) hex = '0' + hex;
+        var bytes = Convert.FromHexString(hex);
+        return BitConverter.ToInt32(bytes);
     }
 
 
