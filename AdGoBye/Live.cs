@@ -30,6 +30,13 @@ public static class Live
           This might also break if the detection failure is caused intentionally by adversarial motive.
  */
         watcher.Created += (_, e) => Task.Run(() => ParseFile(e.FullPath.Replace("__info", "__data")));
+        watcher.Deleted += (_, e) => Task.Run(
+            () =>
+            {
+                Logger.Verbose("File removal: {directory}", e.FullPath);
+                Indexer.RemoveFromIndex(e.FullPath.Replace("__info", "__data"));
+            });
+
         watcher.Error += (_, e) =>
         {
             Logger.Error("{source}: {exception}", e.GetException().Message, e.GetException().Message);
