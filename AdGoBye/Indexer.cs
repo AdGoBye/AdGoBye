@@ -281,7 +281,7 @@ public class Indexer
         {
             if (gameObjectBase["blueprintId"].AsString == "")
             {
-                Logger.Warning("{directory} has no embedded ID for some reason, skipping this…", path);
+                Log.Warning("{directory} has no embedded ID for some reason, skipping this…", path);
                 return null;
             }
 
