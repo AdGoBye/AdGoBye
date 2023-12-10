@@ -136,7 +136,7 @@ public class Indexer
         return System.Text.Encoding.UTF8.GetString(SHA256.HashData(directoryString));
     }
 
-    private static List<string> GetDirIndex(string vrcCacheDir)
+    private static List<string> GetDirIndex(string workingDir)
     {
         // The file structure of Cache is roughly like this:
         //   - Folder (\w{16}) [We have this]
@@ -146,7 +146,7 @@ public class Indexer
         //          - __lock (if currently used, not actually filesystem file locked)
 
         var dirs = new List<string>();
-        foreach (var dir in new DirectoryInfo(vrcCacheDir).GetDirectories("*", SearchOption.TopDirectoryOnly))
+        foreach (var dir in new DirectoryInfo(workingDir).GetDirectories("*", SearchOption.TopDirectoryOnly))
         {
             var subDirs = dir.GetDirectories();
             switch (subDirs.Length)
