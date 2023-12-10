@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -70,7 +71,7 @@ public class Indexer
 
     private static List<Content> GenerateIndexContents(IEnumerable<string> directoryIndex)
     {
-        var contentList = new List<Content>();
+        var contentBag = new ConcurrentBag<Content>();
         Parallel.ForEach(directoryIndex, directory =>
         {
             // Hack: Using the shared ILogger Logger causes the Parallel.ForEach to never complete
@@ -80,7 +81,7 @@ public class Indexer
             
             threadLogger.Verbose("Loading {directory}", directory);
             if (!File.Exists(directory + "/__data")) return;
-            var content = ParseFile(directory + "/__data");
+            var content = ParseFile(directory + "/__data", threadLogger);
             if (content == null) return;
             if (Settings.Options.Allowlist is not null && Settings.Options.Allowlist.Contains(content.Id))
             {
@@ -89,8 +90,10 @@ public class Indexer
             }
 
             threadLogger.Verbose("Adding to index: {id} ({type})", content.Id, content.Type);
-            contentList.Add(content);
+            contentBag.Add(content);
         });
+
+        var contentList = contentBag.ToList();
 
         WriteIndexToDisk(contentList);
         return contentList;
@@ -235,8 +238,10 @@ public class Indexer
     }
 
 
-    public static Content? ParseFile(string directory)
+    public static Content? ParseFile(string directory, ILogger logger = null!)
     {
+        logger ??= Logger;
+
         AssetsManager manager = new();
         BundleFileInstance bundleInstance;
 
@@ -247,7 +252,7 @@ public class Indexer
         catch (NotImplementedException e)
         {
             if (e.Message != "Cannot handle bundles with multiple block sizes yet.") throw;
-            Logger.Warning(
+            logger.Warning(
                 "{directory} has multiple block sizes, AssetsTools can't handle this yet. Skipping... ",
                 directory);
             return null;
@@ -271,7 +276,7 @@ public class Indexer
 
         if (assetInstance is null)
         {
-            Logger.Warning(
+            logger.Warning(
                 $"Indexing {directory} caused no loadable bundle directory to exist, is this bundle valid?",
                 directory);
             return null;
@@ -293,13 +298,13 @@ public class Indexer
 
         if (id == "")
         {
-            Logger.Warning("{directory} has no embedded ID for some reason, skipping this…", directory);
+            logger.Warning("{directory} has no embedded ID for some reason, skipping this…", directory);
             return null;
         }
 
         if (type >= 3)
         {
-            Logger.Warning(
+            logger.Warning(
                 "{directory} is neither Avatar nor World but another secret other thing ({type}), skipping this...",
                 directory, type);
             return null;
