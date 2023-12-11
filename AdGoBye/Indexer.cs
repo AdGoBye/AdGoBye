@@ -338,7 +338,8 @@ public class Indexer
             catch (Exception e)
             {
                 Logger.Error(e, "Plugin {Name} ({Maintainer}) v{Version} threw an exception while patching {ID} ({path})",
-                                       plugin.Name, plugin.Maintainer, plugin.Version, content.Id);
+                                       plugin.Name, plugin.Maintainer, plugin.Version, content.Id, content.Path);
+
             }
         }
 
