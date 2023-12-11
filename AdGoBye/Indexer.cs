@@ -172,7 +172,7 @@ public class Indexer
     {
         using var db = new IndexContext();
         var directory = new DirectoryInfo(path);
-        return db.Content.FirstOrDefault(content => content.StableContentName == directory.Parent!.Parent!.Name);
+        return db.Content.Include(content => content.VersionMeta).FirstOrDefault(content => content.StableContentName == directory.Parent!.Parent!.Name);
     }
 
     public static void RemoveFromIndex(string path)
