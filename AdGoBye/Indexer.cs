@@ -324,21 +324,37 @@ public class Indexer
         Logger.Information("Processing {ID} ({path})", content.Id, content.Path);
         foreach (var plugin in PluginLoader.LoadedPlugins)
         {
-            var pluginApplies = plugin.Instance.PluginType() == EPluginType.Global;
-            if (!pluginApplies && plugin.Instance.PluginType() == EPluginType.ContentSpecific)
+            try
             {
-                var ctIds = plugin.Instance.ResponsibleForContentIds();
-                if (ctIds != null) pluginApplies = ctIds.Contains(content.Id);
-            }
+                var pluginApplies = plugin.Instance.PluginType() == EPluginType.Global;
+                if (!pluginApplies && plugin.Instance.PluginType() == EPluginType.ContentSpecific)
+                {
+                    var ctIds = plugin.Instance.ResponsibleForContentIds();
+                    if (ctIds != null) pluginApplies = ctIds.Contains(content.Id);
+                }
 
-            if (pluginApplies) plugin.Instance.Patch(content.Id, content.Path.Replace("__data", ""));
+                if (pluginApplies) plugin.Instance.Patch(content.Id, content.Path.Replace("__data", ""));
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Plugin {Name} ({Maintainer}) v{Version} threw an exception while patching {ID} ({path})",
+                                       plugin.Name, plugin.Maintainer, plugin.Version, content.Id, content.Path);
+
+            }
         }
 
         // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract - False positive
         if (Blocklist.Blocks is null) return;
         foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
         {
-            Blocklist.Patch(content.Path, block.Value.ToArray());
+            try
+            {
+                Blocklist.Patch(content.Path, block.Value.ToArray());
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to patch {ID} ({path})", content.Id, content.Path);
+            }
         }
     }
 }
