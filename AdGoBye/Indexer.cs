@@ -1,9 +1,13 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using AdGoBye.Plugins;
 using AssetsTools.NET.Extra;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Win32;
 using Serilog;
+using DbContext = Microsoft.EntityFrameworkCore.DbContext;
 
 namespace AdGoBye;
 
@@ -20,22 +24,105 @@ public record Content
     public required ContentVersionMeta VersionMeta { get; set; }
     public required string StableContentName { get; init; }
 
-    public struct ContentVersionMeta
+
+    public record ContentVersionMeta
     {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
         public required int Version { get; set; }
         public required string Path { get; set; }
         public List<string> PatchedBy { get; set; }
     }
 }
 
+public sealed class IndexContext : DbContext
+{
+#pragma warning disable CS8618 //
+    public DbSet<Content> Content { get; set; }
+    public DbSet<Content.ContentVersionMeta> ContentVersionMetas { get; set; }
+#pragma warning restore CS8618
+
+    protected override void OnConfiguring(DbContextOptionsBuilder options)
+        => options.UseSqlite("Data Source=database.db");
+}
+
 public class Indexer
 {
     private static readonly ILogger Logger = Log.ForContext(typeof(Indexer));
     public static readonly string WorkingDirectory = GetWorkingDirectory();
-    public static readonly List<Content> Index = PopulateIndex();
+
+    public static void ManageIndex()
+    {
+        using var db = new IndexContext();
+        if (db.Content.Any()) VerifyDbTruth();
+        var contentFolders = new DirectoryInfo(GetCacheDir()).GetDirectories();
+        if (contentFolders.Length == db.Content.Count() - SafeAllowlistCount()) return;
+        foreach (var newContent in contentFolders.ExceptBy(db.Content.Select(content => content.StableContentName),
+                     info => info.Name))
+        {
+            if (!File.Exists(GetLatestFileVersion(newContent)!.FullName + "/__data")) continue;
+            AddToIndex(GetLatestFileVersion(newContent)!.FullName);
+        }
+        Logger.Information("Finished Index processing");
+        return;
+
+        static int SafeAllowlistCount()
+        {
+            return Settings.Options.Allowlist is not null ? Settings.Options.Allowlist.Length : 0;
+        }
+    }
+
+    private static void VerifyDbTruth()
+    {
+        using var db = new IndexContext();
+        foreach (var content in db.Content.Include(content => content.VersionMeta))
+        {
+            var directoryMeta = new DirectoryInfo(content.VersionMeta.Path);
+            if (!directoryMeta.Parent!.Exists) // This content doesn't have a StableContentId folder anymore
+            {
+                db.Remove(content);
+                continue;
+            }
+
+            // We know the content is still being tracked but we don't know if its actually relevant
+            // so we'll resolve every version to determine the highest and mutate based on that
+            var highestVersion = 0;
+            DirectoryInfo? highestVersionDir = null;
+            foreach (var verFolder in directoryMeta.Parent.GetDirectories())
+            {
+                var version = GetVersion(verFolder.Name);
+                if (version < highestVersion) continue;
+                highestVersion = version;
+                highestVersionDir = verFolder;
+            }
+
+            if (!File.Exists(highestVersionDir!.FullName + "/__data"))
+            {
+                db.Remove(content);
+                Log.Warning(
+                    "{directory} is highest version but doesn't have __data, hell might have frozen over. Removed from Index",
+                    highestVersionDir.FullName);
+                continue;
+            }
+
+            if (highestVersion > content.VersionMeta.Version)
+            {
+                content.VersionMeta = new Content.ContentVersionMeta
+                {
+                    Version = highestVersion,
+                    Path = highestVersionDir.FullName,
+                    PatchedBy = [],
+                };
+            }
+        }
+
+        db.SaveChanges();
+    }
 
     public static void AddToIndex(string path)
     {
+        using var db = new IndexContext();
         //   - Folder (StableContentName) [singleton, we want this]
         //       - Folder (version) [may exist multiple times] 
         //          - __info
@@ -45,45 +132,58 @@ public class Indexer
         if (directory.Name == "__data") directory = directory.Parent;
 
         // If we already have an item in Index that has the same StableContentName, then this is a newer version of something Indexed
-        var indexMatch = Index.Find(content => content.StableContentName == directory!.Parent!.Parent!.Name);
-        if (indexMatch is not null)
+        var content = db.Content.Include(content => content.VersionMeta)
+            .FirstOrDefault(content => content.StableContentName == directory!.Parent!.Parent!.Name);
+        if (content is not null)
         {
             var version = GetVersion(directory!.Parent!.Name);
-            if (version > indexMatch.VersionMeta.Version)
+            if (version > content.VersionMeta.Version)
             {
-                indexMatch.VersionMeta = new Content.ContentVersionMeta
-                    { Version = version, Path = path, PatchedBy = new List<string>() };
+                content.VersionMeta = new Content.ContentVersionMeta
+                {
+                    Version = version,
+                    Path = path,
+                    PatchedBy = []
+                };
             }
             else
             {
                 Logger.Verbose(
                     "Skipped Indexation of {directory} since it isn't an upgrade (Index: {greaterVersion}, Parsed: {lesserVersion})",
-                    directory.FullName, indexMatch.VersionMeta.Version, version);
+                    directory.FullName, content.VersionMeta.Version, version);
                 return;
             }
         }
         else
         {
-            indexMatch = FileToContent(directory!);
-            if (indexMatch is not null) Index.Add(indexMatch);
+            content = FileToContent(directory!);
+            if (content is not null)
+            {
+                db.Content.Add(content);
+                Logger.Information("Added {id} [{type}] to Index", content.Id, content.Type);
+            }
             else return;
         }
 
-        PatchContent(indexMatch);
+        db.SaveChanges();
     }
 
     public static Content? GetFromIndex(string path)
     {
+        using var db = new IndexContext();
         var directory = new DirectoryInfo(path);
-        return Index.FirstOrDefault(content => content.StableContentName == directory.Parent!.Parent!.Name);
+        return db.Content.FirstOrDefault(content => content.StableContentName == directory.Parent!.Parent!.Name);
     }
 
     public static void RemoveFromIndex(string path)
     {
+        using var db = new IndexContext();
         var indexMatch = GetFromIndex(path);
         if (indexMatch is null) return;
 
-        Index.Remove(indexMatch);
+
+        db.Content.Remove(indexMatch);
+        db.SaveChanges();
         Logger.Information("Removed {id} from Index", indexMatch.Id);
     }
 
@@ -91,33 +191,8 @@ public class Indexer
     {
         var directoryIndex = GetDirIndex(GetCacheDir());
 
-        // if (File.Exists("cache.json"))
-        // {
-        //     var diskCache = JsonSerializer.Deserialize<IndexSerializationRoot>(File.ReadAllText("cache.json"));
-        //     if (GetCurrentDirectoryHash() == diskCache.Hash)
-        //     {
-        //         if (Settings.Options.Allowlist is null) return diskCache.IndexContent;
-        //         var sanitizedList = RemoveAllowlistItems(diskCache.IndexContent);
-        //         WriteIndexToDisk(sanitizedList);
-        //         return sanitizedList;
-        //     }
-        // }
-
         Logger.Information("Index does not exist, generating");
         return DirIndexToContent(directoryIndex);
-
-        List<Content> RemoveAllowlistItems(List<Content> diskCache)
-        {
-            foreach (var removedContent in Settings.Options.Allowlist!)
-            {
-                if (diskCache.RemoveAll(c => c.Id == removedContent) is not 0)
-                {
-                    Log.Information("Removed {id} from cached Index in accordance with Allowlist", removedContent);
-                }
-            }
-
-            return diskCache;
-        }
     }
 
     public static void PatchContent(Content content)
@@ -179,14 +254,32 @@ public class Indexer
                     return;
                 }
 
+                using var db = new IndexContext();
                 var parsed = FileToContent(highestVersionDir);
                 if (parsed is null) return;
 
                 contentList.Add(parsed);
+                db.Add(parsed);
+                db.SaveChanges();
             }
         );
 
         return contentList;
+    }
+
+    private static DirectoryInfo? GetLatestFileVersion(DirectoryInfo stableNameFolder)
+    {
+        var highestVersion = 0;
+        DirectoryInfo? highestVersionDir = null;
+        foreach (var directory in stableNameFolder.GetDirectories())
+        {
+            var version = GetVersion(directory.Name);
+            if (version < highestVersion) continue;
+            highestVersion = version;
+            highestVersionDir = directory;
+        }
+
+        return highestVersionDir;
     }
 
     private static DirectoryInfo? GetLatestFileVersion(KeyValuePair<string, List<DirectoryInfo>> file)
@@ -225,7 +318,7 @@ public class Indexer
             {
                 Version = GetVersion(pathToFile.Name),
                 Path = pathToFile.FullName,
-                PatchedBy = new List<string>()
+                PatchedBy = new List<string>(),
             },
             StableContentName = pathToFile.Parent!.Name
         };
@@ -294,7 +387,8 @@ public class Indexer
                 return null;
             }
 
-            return new Tuple<string, int>(gameObjectBase["blueprintId"].AsString, gameObjectBase["contentType"].AsInt);
+            return new Tuple<string, int>(gameObjectBase["blueprintId"].AsString,
+                gameObjectBase["contentType"].AsInt);
         }
 
         return null;
