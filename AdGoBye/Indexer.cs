@@ -224,61 +224,11 @@ public class Indexer
         }
     }
 
-    private static Dictionary<string, List<DirectoryInfo>> GetDirIndex(string vrcCacheDir)
-    {
-        var dirs = new DirectoryInfo(vrcCacheDir).GetDirectories("*", SearchOption.AllDirectories)
-            .Where(info => info.Parent is { Name: not "Cache-WindowsPlayer" });
-
-        return dirs.GroupBy(info => info.Parent!.Name).ToDictionary(info => info.Key, info => info.ToList());
-    }
-
-    private static List<Content> DirIndexToContent(Dictionary<string, List<DirectoryInfo>> dirIndex)
-    {
-        var contentList = new List<Content>();
-        Parallel.ForEach(dirIndex, file =>
-            {
-                var highestVersionDir = GetLatestFileVersion(file);
-
-                if (highestVersionDir is null) // something is horribly wrong if this happens
-                {
-                    Logger.Verbose(
-                        "highestVersionDir was null for after parsing, hell might have frozen over");
-                    return;
-                }
-
-                using var db = new IndexContext();
-                var parsed = FileToContent(highestVersionDir);
-                if (parsed is null) return;
-
-                contentList.Add(parsed);
-                db.Add(parsed);
-                db.SaveChanges();
-            }
-        );
-
-        return contentList;
-    }
-
     private static DirectoryInfo? GetLatestFileVersion(DirectoryInfo stableNameFolder)
     {
         var highestVersion = 0;
         DirectoryInfo? highestVersionDir = null;
         foreach (var directory in stableNameFolder.GetDirectories())
-        {
-            var version = GetVersion(directory.Name);
-            if (version < highestVersion) continue;
-            highestVersion = version;
-            highestVersionDir = directory;
-        }
-
-        return highestVersionDir;
-    }
-
-    private static DirectoryInfo? GetLatestFileVersion(KeyValuePair<string, List<DirectoryInfo>> file)
-    {
-        var highestVersion = 0;
-        DirectoryInfo? highestVersionDir = null;
-        foreach (var directory in file.Value)
         {
             var version = GetVersion(directory.Name);
             if (version < highestVersion) continue;
