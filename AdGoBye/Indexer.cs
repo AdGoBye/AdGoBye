@@ -32,7 +32,7 @@ public record Content
         public int Id { get; set; }
         public required int Version { get; set; }
         public required string Path { get; set; }
-        public List<string> PatchedBy { get; set; }
+        public required List<string> PatchedBy { get; set; }
     }
 }
 
