@@ -187,14 +187,6 @@ public class Indexer
         Logger.Information("Removed {id} from Index", indexMatch.Id);
     }
 
-    private static List<Content> PopulateIndex()
-    {
-        var directoryIndex = GetDirIndex(GetCacheDir());
-
-        Logger.Information("Index does not exist, generating");
-        return DirIndexToContent(directoryIndex);
-    }
-
     public static void PatchContent(Content content)
     {
         if (content.Type is not ContentType.World) return;
@@ -318,7 +310,7 @@ public class Indexer
             {
                 Version = GetVersion(pathToFile.Name),
                 Path = pathToFile.FullName,
-                PatchedBy = new List<string>(),
+                PatchedBy = []
             },
             StableContentName = pathToFile.Parent!.Name
         };
