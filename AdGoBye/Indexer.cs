@@ -30,6 +30,7 @@ public record Content
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
+
         public required int Version { get; set; }
         public required string Path { get; set; }
         public required List<string> PatchedBy { get; set; }
@@ -61,9 +62,11 @@ public class Indexer
         foreach (var newContent in contentFolders.ExceptBy(db.Content.Select(content => content.StableContentName),
                      info => info.Name))
         {
-            if (!File.Exists(GetLatestFileVersion(newContent)!.FullName + "/__data")) continue;
-            AddToIndex(GetLatestFileVersion(newContent)!.FullName);
+            var (latestVersion, _) = GetLatestFileVersion(newContent);
+            if (latestVersion is null) return;
+            AddToIndex(latestVersion.FullName);
         }
+
         Logger.Information("Finished Index processing");
         return;
 
@@ -87,15 +90,7 @@ public class Indexer
 
             // We know the content is still being tracked but we don't know if its actually relevant
             // so we'll resolve every version to determine the highest and mutate based on that
-            var highestVersion = 0;
-            DirectoryInfo? highestVersionDir = null;
-            foreach (var verFolder in directoryMeta.Parent.GetDirectories())
-            {
-                var version = GetVersion(verFolder.Name);
-                if (version < highestVersion) continue;
-                highestVersion = version;
-                highestVersionDir = verFolder;
-            }
+            var (highestVersionDir, highestVersion) = GetLatestFileVersion(directoryMeta.Parent);
 
             if (!File.Exists(highestVersionDir!.FullName + "/__data"))
             {
@@ -137,26 +132,25 @@ public class Indexer
         if (content is not null)
         {
             var version = GetVersion(directory!.Parent!.Name);
-            if (version > content.VersionMeta.Version)
-            {
-                content.VersionMeta = new Content.ContentVersionMeta
-                {
-                    Version = version,
-                    Path = path,
-                    PatchedBy = []
-                };
-            }
-            else
+            if (version < content.VersionMeta.Version)
             {
                 Logger.Verbose(
                     "Skipped Indexation of {directory} since it isn't an upgrade (Index: {greaterVersion}, Parsed: {lesserVersion})",
                     directory.FullName, content.VersionMeta.Version, version);
                 return;
             }
+
+            content.VersionMeta = content.VersionMeta = new Content.ContentVersionMeta
+            {
+                Version = version,
+                Path = path,
+                PatchedBy = []
+            };
         }
         else
         {
-            content = FileToContent(directory!);
+            if (!File.Exists(directory!.FullName + "/__data")) return;
+            content = FileToContent(directory);
             if (content is not null)
             {
                 db.Content.Add(content);
@@ -172,7 +166,8 @@ public class Indexer
     {
         using var db = new IndexContext();
         var directory = new DirectoryInfo(path);
-        return db.Content.Include(content => content.VersionMeta).FirstOrDefault(content => content.StableContentName == directory.Parent!.Parent!.Name);
+        return db.Content.Include(content => content.VersionMeta)
+            .FirstOrDefault(content => content.StableContentName == directory.Parent!.Parent!.Name);
     }
 
     public static void RemoveFromIndex(string path)
@@ -224,7 +219,7 @@ public class Indexer
         }
     }
 
-    private static DirectoryInfo? GetLatestFileVersion(DirectoryInfo stableNameFolder)
+    private static Tuple<DirectoryInfo?, int> GetLatestFileVersion(DirectoryInfo stableNameFolder)
     {
         var highestVersion = 0;
         DirectoryInfo? highestVersionDir = null;
@@ -236,7 +231,7 @@ public class Indexer
             highestVersionDir = directory;
         }
 
-        return highestVersionDir;
+        return new Tuple<DirectoryInfo?, int>(highestVersionDir, highestVersion);
     }
 
     private static Content? FileToContent(DirectoryInfo pathToFile)
