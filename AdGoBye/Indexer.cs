@@ -39,13 +39,15 @@ public record Content
 
 public sealed class IndexContext : DbContext
 {
+    protected override void OnConfiguring(DbContextOptionsBuilder options)
+    {
+        options.UseSqlite("Data Source=database.db");
+    }
+
 #pragma warning disable CS8618 //
     public DbSet<Content> Content { get; set; }
     public DbSet<Content.ContentVersionMeta> ContentVersionMetas { get; set; }
 #pragma warning restore CS8618
-
-    protected override void OnConfiguring(DbContextOptionsBuilder options)
-        => options.UseSqlite("Data Source=database.db");
 }
 
 public class Indexer
@@ -102,14 +104,12 @@ public class Indexer
             }
 
             if (highestVersion > content.VersionMeta.Version)
-            {
                 content.VersionMeta = new Content.ContentVersionMeta
                 {
                     Version = highestVersion,
                     Path = highestVersionDir.FullName,
-                    PatchedBy = [],
+                    PatchedBy = []
                 };
-            }
         }
 
         db.SaveChanges();
@@ -348,11 +348,9 @@ public class Indexer
         var pathToCache = "/" + appName + "/" + appName + "/";
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
             return
                 $"/home/{Environment.UserName}/.steam/steam/steamapps/compatdata/438100/pfx/drive_c/users/steamuser/AppData/LocalLow" +
                 pathToCache;
-        }
 
         var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
             .Replace("Roaming", "LocalLow");
