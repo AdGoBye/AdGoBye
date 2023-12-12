@@ -59,11 +59,10 @@ public static class Live
             try
             {
                 Indexer.AddToIndex(path);
-                Logger.Verbose("Hitting lock");
                 Ewh.WaitOne();
                 Indexer.PatchContent(Indexer.GetFromIndex(path)!);
                 done = true;
-            }
+            }   
             catch (EndOfStreamException)
             {
                 await Task.Delay(500);
