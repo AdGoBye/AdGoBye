@@ -104,12 +104,6 @@ public static class Blocklist
 
     public static void Patch(string assetPath, GameObjectInstance[] gameObjectsToDisable)
     {
-        if (File.Exists(assetPath + ".bak"))
-        {
-            Logger.Verbose("Skipping this because backup file indicates current version is patched");
-            return;
-        }
-
         var bundleInstance = Manager.LoadBundleFile(assetPath);
 
         var bundle = bundleInstance.file;
