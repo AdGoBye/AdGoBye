@@ -44,6 +44,8 @@ foreach (var content in db.Content.Include(content => content.VersionMeta ))
     Indexer.PatchContent(content);
 }
 
+db.SaveChanges();
+
 #pragma warning disable CS4014
 if (Settings.Options.EnableLive)
 {
