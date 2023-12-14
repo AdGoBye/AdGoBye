@@ -128,10 +128,10 @@ public class Indexer
 
         // If we already have an item in Index that has the same StableContentName, then this is a newer version of something Indexed
         var content = db.Content.Include(content => content.VersionMeta)
-            .FirstOrDefault(content => content.StableContentName == directory!.Parent!.Parent!.Name);
+            .FirstOrDefault(content => content.StableContentName == directory!.Parent!.Name);
         if (content is not null)
         {
-            var version = GetVersion(directory!.Parent!.Name);
+            var version = GetVersion(directory!.Name);
             if (version < content.VersionMeta.Version)
             {
                 Logger.Verbose(
@@ -143,7 +143,7 @@ public class Indexer
             content.VersionMeta = content.VersionMeta = new Content.ContentVersionMeta
             {
                 Version = version,
-                Path = path,
+                Path = directory.FullName,
                 PatchedBy = []
             };
         }
