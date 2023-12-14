@@ -103,13 +103,10 @@ public class Indexer
                 continue;
             }
 
-            if (highestVersion > content.VersionMeta.Version)
-                content.VersionMeta = new Content.ContentVersionMeta
-                {
-                    Version = highestVersion,
-                    Path = highestVersionDir.FullName,
-                    PatchedBy = []
-                };
+            if (highestVersion <= content.VersionMeta.Version) continue;
+            content.VersionMeta.Version = highestVersion;
+            content.VersionMeta.Path = highestVersionDir.FullName;
+            content.VersionMeta.PatchedBy = [];
         }
 
         db.SaveChanges();
@@ -140,12 +137,9 @@ public class Indexer
                 return;
             }
 
-            content.VersionMeta = content.VersionMeta = new Content.ContentVersionMeta
-            {
-                Version = version,
-                Path = directory.FullName,
-                PatchedBy = []
-            };
+            content.VersionMeta.Version = version;
+            content.VersionMeta.Path = directory.FullName;
+            content.VersionMeta.PatchedBy = [];
         }
         else
         {
