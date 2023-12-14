@@ -19,7 +19,7 @@
 
         public virtual bool OverrideBlocklist(string contentId)
         {
-            throw new NotImplementedException();
+            return false;
         }
 
         public virtual EPatchResult Patch(string contentId, string dataDirectoryPath)
@@ -29,7 +29,7 @@
 
         public virtual EVerifyResult Verify(string contentId, string dataDirectoryPath)
         {
-            throw new NotImplementedException();
+            return EVerifyResult.Success;
         }
     }
 }
