@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Serilog;
 
 // ReSharper disable FunctionNeverReturns
@@ -89,47 +90,61 @@ public static class Live
         timer.Enabled = true;
     }
 
-    public static void ParseLogLock()
+    [SuppressMessage("ReSharper", "MethodSupportsCancellation")]
+    public static void WatchLogFile(string path)
     {
-        var currentLogFile = GetNewestLog();
-        var sr = GetLogStream(currentLogFile);
+        CancellationTokenSource ct = new();
+        var currentTask = Task.Run(() => HandleFileLock(GetNewestLog(), ct.Token));
+        
+        using var watcher = new FileSystemWatcher(path);
+        watcher.NotifyFilter = NotifyFilters.FileName;
+        watcher.Created += (_, e) =>
+        {
+            ct.Cancel();
+            currentTask.Wait();
+            ct = new CancellationTokenSource();
 
+            // Assuming a new log file means a client restart, it's likely not loading any file.
+            // Let's take initiative and free any tasks.
+            Ewh.Set();
+            
+            currentTask = Task.Run(() => HandleFileLock(e.FullPath, ct.Token));
+            Logger.Verbose("Rotated log parsing to {file}", e.Name);
+        };
+
+        watcher.Filter = "*.txt";
+        watcher.IncludeSubdirectories = false;
+        watcher.EnableRaisingEvents = true;
         while (true)
         {
-            if (GetNewestLog() != currentLogFile)
-            {
-                Logger.Verbose("Switching file, new log file exists");
-                currentLogFile = GetNewestLog();
-                sr = GetLogStream(currentLogFile);
-
-                // Assuming a new log file means a client restart, it's likely not loading any file.
-                // Let's take initiative and free any tasks.
-                Ewh.Set();
-                continue;
-            }
-
-            var s = sr.ReadLine();
-            if (s == null)
-            {
-                continue;
-            }
-
-            if (s.Contains(LoadStartIndicator))
-            {
-                Logger.Verbose("Expecting world load: {msg}", s);
-                Ewh.Reset();
-            }
-            else if (s.Contains(LoadStopIndicator))
-            {
-                Logger.Verbose("Expecting world load finish: {msg}", s);
-                Ewh.Set();
-            }
+            watcher.WaitForChanged(WatcherChangeTypes.Created, Timeout.Infinite);
         }
     }
 
-    private static StreamReader GetLogStream(string loglocation)
+    private static void HandleFileLock(string logFile, CancellationToken cancellationToken)
     {
-        var fs = new FileStream(loglocation, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        var sr = GetLogStream(logFile);
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var line = sr.ReadLine();
+            switch (line)
+            {
+                case not null when line.Contains(LoadStartIndicator):
+                    Logger.Verbose("Expecting world load: {msg}", line);
+                    Ewh.Reset();
+                    break;
+                case not null when line.Contains(LoadStopIndicator):
+                    Logger.Verbose("Expecting world load finish: {msg}", line);
+                    Ewh.Set();
+                    break;
+            }
+            Thread.Sleep(50);
+        }
+    }
+
+    private static StreamReader GetLogStream(string logFile)
+    {
+        var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         var sr = new StreamReader(fs);
         sr.BaseStream.Seek(0, SeekOrigin.End);
         return sr;
