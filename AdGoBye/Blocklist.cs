@@ -12,7 +12,6 @@ using AssetsTools.NET.Extra;
 [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 public static class Blocklist
 {
-    private static readonly AssetsManager Manager = new();
     public static Dictionary<string, HashSet<GameObjectInstance>> Blocks;
     private static readonly ILogger Logger = Log.ForContext(typeof(Blocklist));
 
@@ -109,19 +108,20 @@ public static class Blocklist
             Logger.Verbose("Skipping this because backup file indicates current version is patched");
             return;
         }
+        AssetsManager manager = new();
 
-        var bundleInstance = Manager.LoadBundleFile(assetPath);
+        var bundleInstance = manager.LoadBundleFile(assetPath);
 
         var bundle = bundleInstance.file;
         // [Test this] Assumption: Relevant index is always at 1
-        var assetFileInstance = Manager.LoadAssetsFileFromBundle(bundleInstance, 1);
+        var assetFileInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 1);
         var assetFile = assetFileInstance.file;
 
         foreach (var gameObject in assetFile.GetAssetsOfType(AssetClassID.GameObject))
         {
             foreach (var blocklistGameObject in gameObjectsToDisable)
             {
-                var baseGameObject = Manager.GetBaseField(assetFileInstance, gameObject);
+                var baseGameObject = manager.GetBaseField(assetFileInstance, gameObject);
                 if (baseGameObject["m_Name"].AsString != blocklistGameObject.Name) continue;
                 if (!baseGameObject["m_IsActive"].AsBool) continue;
 
@@ -153,7 +153,7 @@ public static class Blocklist
         bool DoesParentMatch(AssetExternal FatherPos, AssetsFileInstance assetsFileInstance,
             GameObjectInstance blocklistGameObject)
         {
-            var fatherGameObject = Manager.GetExtAsset(assetsFileInstance, FatherPos.baseField["m_GameObject"]);
+            var fatherGameObject = manager.GetExtAsset(assetsFileInstance, FatherPos.baseField["m_GameObject"]);
 
             if (blocklistGameObject.Parent!.Position is not null)
             {
@@ -169,7 +169,7 @@ public static class Blocklist
         {
             foreach (var data in baseGameObject["m_Component.Array"])
             {
-                var componentInstance = Manager.GetExtAsset(assetfileinstance, data["component"]);
+                var componentInstance = manager.GetExtAsset(assetfileinstance, data["component"]);
                 if ((AssetClassID)componentInstance.info.TypeId is not AssetClassID.RectTransform
                     and not AssetClassID.Transform)
                     continue;
@@ -183,7 +183,7 @@ public static class Blocklist
                 if (blocklistGameObject.Parent is not null)
                 {
                     var fatherGameObject =
-                        Manager.GetExtAsset(assetfileinstance, componentInstance.baseField["m_Father"]);
+                        manager.GetExtAsset(assetfileinstance, componentInstance.baseField["m_Father"]);
                     if (!DoesParentMatch(fatherGameObject, assetfileinstance, blocklistGameObject)) return false;
                 }
             }
