@@ -50,12 +50,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >
-          for d in ${{ github.workspace }}/bin/*/ ; do
+          name="AGB${{ github.event.release.tag_name }}-${{ matrix.os }}.zip"
 
-          name="AGB${{ github.event.release.tag_name }}-$(basename $d)"
+          cd ${{github.workspace}}/bin/${{matrix.os}}-build
 
-          zip $name "/$d" -r
+          zip $name . -r
 
-          gh release upload ${{github.event.release.tag_name}} $name -R ${{ github.repository }}
-
-          done
+          gh release upload ${{ github.event.release.tag_name }} $name -R ${{ github.repository }}
