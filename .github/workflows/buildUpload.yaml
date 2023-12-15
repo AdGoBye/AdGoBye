@@ -1,0 +1,61 @@
+---
+name: Build and Upload
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - AdGoBye
+      - AdGoBye.*
+  pull_request: null
+  release:
+    types:
+      - created
+env:
+  DOTNET_VERSION: 8.0.x
+jobs:
+  build:
+    name: Build and upload
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        os:
+          - win-x64
+          - linux-x64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{env.DOTNET_VERSION}}
+      - name: Install dependencies
+        run: dotnet restore
+      - name: Build
+        run: >
+          cd AdGoBye
+
+          mkdir -p ${{ github.workspace }}/bin
+
+          dotnet publish -c Release -p:PublishDir=${{ github.workspace }}/bin/${{matrix.os}}-build -r ${{matrix.os}} -p:AssemblyFileVersion=${{ github.event.release.tag_name }} -p:IncludeNativeLibrariesForSelfExtract=true -p:UseAppHost=true -p:PublishSingleFile=true  --self-contained false
+      - name: Upload as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{matrix.os}}-build
+          path: ${{github.workspace}}/bin/${{matrix.os}}-build
+          if-no-files-found: error
+      - name: Optionally upload to release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          for d in ${{ github.workspace }}/bin/*/ ; do
+
+          name="AGB${{ github.event.release.tag_name }}-$(basename $d)"
+
+          zip $name "/$d" -r
+
+          gh release upload ${{github.event.release.tag_name}} $name -R ${{ github.repository }}
+
+          done
