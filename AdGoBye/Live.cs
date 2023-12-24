@@ -108,19 +108,23 @@ public static class Live
         var sr = GetLogStream(logFile);
         while (!cancellationToken.IsCancellationRequested)
         {
-            var line = sr.ReadLine();
-            switch (line)
+            var output = sr.ReadToEnd();
+            var lines = output.Split(Environment.NewLine);
+            foreach (var line in lines)
             {
-                case not null when line.Contains(LoadStartIndicator):
-                    Logger.Verbose("Expecting world load: {msg}", line);
-                    Ewh.Reset();
-                    break;
-                case not null when line.Contains(LoadStopIndicator):
-                    Logger.Verbose("Expecting world load finish: {msg}", line);
-                    Ewh.Set();
-                    break;
+                switch (line)
+                {
+                    case not null when line.Contains(LoadStartIndicator):
+                        Logger.Verbose("Expecting world load: {msg}", line);
+                        Ewh.Reset();
+                        break;
+                    case not null when line.Contains(LoadStopIndicator):
+                        Logger.Verbose("Expecting world load finish: {msg}", line);
+                        Ewh.Set();
+                        break;
+                }
             }
-            Thread.Sleep(50);
+            Thread.Sleep(300);
         }
     }
 
