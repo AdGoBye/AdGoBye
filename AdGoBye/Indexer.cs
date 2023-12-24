@@ -330,6 +330,14 @@ public class Indexer
         var hex = hexVersion.TrimStart('0');
         if (hex.Length % 2 != 0) hex = '0' + hex;
         var bytes = Convert.FromHexString(hex);
+        while (bytes.Length < 4)
+        {
+            var newValues = new byte[bytes.Length + 1];
+            newValues[0] = 0x00;
+            Array.Copy(bytes, 0, newValues, 1, bytes.Length);
+            bytes = newValues;
+        }
+
         return BitConverter.ToInt32(bytes);
     }
 
