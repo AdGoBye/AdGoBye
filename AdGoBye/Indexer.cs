@@ -199,9 +199,8 @@ public class Indexer
                 if (plugin.Instance.Verify(content.Id, content.VersionMeta.Path) is not EVerifyResult.Success)
                     pluginApplies = false;
 
-
                 if (pluginApplies) plugin.Instance.Patch(content.Id, content.VersionMeta.Path);
-                content.VersionMeta.PatchedBy.Add(plugin.Name);
+                if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add(plugin.Name);
             }
             catch (Exception e)
             {
@@ -219,7 +218,7 @@ public class Indexer
             try
             {
                 Blocklist.Patch(content.VersionMeta.Path + "/__data", block.Value.ToArray());
-                content.VersionMeta.PatchedBy.Add("Blocklist");
+                if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
             }
             catch (Exception e)
             {
@@ -345,6 +344,14 @@ public class Indexer
         var hex = hexVersion.TrimStart('0');
         if (hex.Length % 2 != 0) hex = '0' + hex;
         var bytes = Convert.FromHexString(hex);
+        while (bytes.Length < 4)
+        {
+            var newValues = new byte[bytes.Length + 1];
+            newValues[0] = 0x00;
+            Array.Copy(bytes, 0, newValues, 1, bytes.Length);
+            bytes = newValues;
+        }
+
         return BitConverter.ToInt32(bytes);
     }
 
