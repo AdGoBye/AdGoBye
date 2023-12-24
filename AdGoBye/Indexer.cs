@@ -199,7 +199,7 @@ public class Indexer
 
 
             if (pluginApplies) plugin.Instance.Patch(content.Id, content.VersionMeta.Path);
-            content.VersionMeta.PatchedBy.Add(plugin.Name);
+            if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add(plugin.Name);
         }
 
         // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract - False positive
@@ -209,7 +209,7 @@ public class Indexer
         foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
         {
             Blocklist.Patch(content.VersionMeta.Path + "/__data", block.Value.ToArray());
-            content.VersionMeta.PatchedBy.Add("Blocklist");
+            if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
         }
     }
 
