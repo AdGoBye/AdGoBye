@@ -202,6 +202,7 @@ public class Indexer
 
                 if (pluginApplies) plugin.Instance.Patch(content.Id, content.VersionMeta.Path);
                 content.VersionMeta.PatchedBy.Add(plugin.Name);
+            }
             catch (Exception e)
             {
                 Logger.Error(e, "Plugin {Name} ({Maintainer}) v{Version} threw an exception while patching {ID} ({path})",
