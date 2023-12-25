@@ -140,21 +140,102 @@ public class Indexer
             content.VersionMeta.Version = version;
             content.VersionMeta.Path = directory.FullName;
             content.VersionMeta.PatchedBy = [];
-        }
-        else
-        {
-            if (!File.Exists(directory!.FullName + "/__data")) return;
-            content = FileToContent(directory);
-            if (content is not null)
-            {
-                db.Content.Add(content);
-                Logger.Information("Added {id} [{type}] to Index", content.Id, content.Type);
-            }
-            else return;
+
+            db.SaveChanges();
+            return;
         }
 
-        db.SaveChanges();
+        if (!File.Exists(directory!.FullName + "/__data")) return;
+        content = FileToContent(directory);
+        if (content is null) return;
+        var indexCopy = db.Content.Include(existingFile => existingFile.VersionMeta)
+            .FirstOrDefault(existingFile => existingFile.Id == content.Id);
+
+        if (indexCopy is null)
+        {
+            if (content.Type is ContentType.Avatar && IsAvatarImposter(content.VersionMeta.Path))
+            {
+                Logger.Information("Skipping {path} because it's an Imposter avatar", content.VersionMeta.Path);
+                return;
+            }
+
+            db.Content.Add(content);
+            Logger.Information("Added {id} [{type}] to Index", content.Id, content.Type);
+            db.SaveChanges();
+            return;
+        }
+
+        switch (indexCopy.Type)
+        {
+            // There are two unique cases where content may share a Content ID with a different StableContentName
+            // The first is a world Unity version upgrade, in that case we simply use the newer version
+            case ContentType.World:
+                if (!IsWorldHigherUnityVersion(indexCopy, content)) return;
+                indexCopy.VersionMeta.Version = content.VersionMeta.Version;
+                indexCopy.VersionMeta.Path = content.VersionMeta.Path;
+                indexCopy.VersionMeta.PatchedBy = [];
+                db.SaveChanges();
+                return;
+            // The second is an Imposter avatar, which we don't want to index.
+            case ContentType.Avatar:
+                if (IsAvatarImposter(content.VersionMeta.Path))
+                {
+                    Logger.Information("Skipping {path} because it's an Imposter avatar", content.VersionMeta.Path);
+                    return;
+                }
+
+                break;
+            default:
+                throw new NotImplementedException();
+        }
+
+        return;
+
+        static bool IsAvatarImposter(string path)
+        {
+            AssetsManager manager = new();
+            var bundleInstance = manager.LoadBundleFile(path + "/__data");
+            var assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 0);
+
+            foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoScript))
+            {
+                var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
+                if (monoScriptBase["m_ClassName"].IsDummy ||
+                    monoScriptBase["m_ClassName"].AsString != "Impostor") continue;
+                return true;
+            }
+
+            return false;
+        }
+
+        static bool IsWorldHigherUnityVersion(Content IndexedContent, Content newContent)
+        {
+            // Hack: [Regalia 2023-12-25T03:33:18Z] I'm not paid enough to parse Unity version strings reliably
+            // This assumes the Unity versions always contains the major version at the start, is seperated by a dot and 
+            // the major versions will always be greater to each other. Upcoming Unity 6 will violate this assumption
+            // but I'm betting that service provider won't upgrade anytime soon
+            var indexedContentVersion = ResolveUnityVersion(IndexedContent.VersionMeta.Path).Split(".")[0];
+            var newContentVersion = ResolveUnityVersion(newContent.VersionMeta.Path).Split(".")[0];
+            return int.Parse(newContentVersion) > int.Parse(indexedContentVersion);
+        }
+
+        static string ResolveUnityVersion(string path)
+        {
+            AssetsManager manager = new();
+            var bundleInstance = manager.LoadBundleFile(path + "/__data");
+            var assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 0);
+
+            foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoBehaviour))
+            {
+                var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
+                if (monoScriptBase["unityVersion"].IsDummy) continue;
+                return monoScriptBase["unityVersion"].AsString;
+            }
+
+            return "";
+        }
     }
+
 
     public static Content? GetFromIndex(string path)
     {
@@ -204,8 +285,9 @@ public class Indexer
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Plugin {Name} ({Maintainer}) v{Version} threw an exception while patching {ID} ({path})",
-                                       plugin.Name, plugin.Maintainer, plugin.Version, content.Id, content.VersionMeta?.Path);
+                Logger.Error(e,
+                    "Plugin {Name} ({Maintainer}) v{Version} threw an exception while patching {ID} ({path})",
+                    plugin.Name, plugin.Maintainer, plugin.Version, content.Id, content.VersionMeta?.Path);
             }
         }
 
