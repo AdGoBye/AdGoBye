@@ -183,23 +183,30 @@ public class Indexer
         var pluginOverridesBlocklist = false;
         foreach (var plugin in PluginLoader.LoadedPlugins)
         {
-            if (content.VersionMeta.PatchedBy.Contains(plugin.Name)) continue;
-
-            var pluginApplies = plugin.Instance.PluginType() == EPluginType.Global;
-            if (!pluginApplies && plugin.Instance.PluginType() == EPluginType.ContentSpecific)
+            try
             {
-                var ctIds = plugin.Instance.ResponsibleForContentIds();
-                if (ctIds is not null) pluginApplies = ctIds.Contains(content.Id);
+                if (content.VersionMeta.PatchedBy.Contains(plugin.Name)) continue;
+
+                var pluginApplies = plugin.Instance.PluginType() == EPluginType.Global;
+                if (!pluginApplies && plugin.Instance.PluginType() == EPluginType.ContentSpecific)
+                {
+                    var ctIds = plugin.Instance.ResponsibleForContentIds();
+                    if (ctIds is not null) pluginApplies = ctIds.Contains(content.Id);
+                }
+
+                pluginOverridesBlocklist = plugin.Instance.OverrideBlocklist(content.Id);
+
+                if (plugin.Instance.Verify(content.Id, content.VersionMeta.Path) is not EVerifyResult.Success)
+                    pluginApplies = false;
+
+                if (pluginApplies) plugin.Instance.Patch(content.Id, content.VersionMeta.Path);
+                if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add(plugin.Name);
             }
-
-            pluginOverridesBlocklist = plugin.Instance.OverrideBlocklist(content.Id);
-
-            if (plugin.Instance.Verify(content.Id, content.VersionMeta.Path) is not EVerifyResult.Success)
-                pluginApplies = false;
-
-
-            if (pluginApplies) plugin.Instance.Patch(content.Id, content.VersionMeta.Path);
-            if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add(plugin.Name);
+            catch (Exception e)
+            {
+                Logger.Error(e, "Plugin {Name} ({Maintainer}) v{Version} threw an exception while patching {ID} ({path})",
+                                       plugin.Name, plugin.Maintainer, plugin.Version, content.Id, content.VersionMeta?.Path);
+            }
         }
 
         // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract - False positive
@@ -208,8 +215,15 @@ public class Indexer
         if (content.VersionMeta.PatchedBy.Contains("Blocklist")) return;
         foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
         {
-            Blocklist.Patch(content.VersionMeta.Path + "/__data", block.Value.ToArray());
-            if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
+            try
+            {
+                Blocklist.Patch(content.VersionMeta.Path + "/__data", block.Value.ToArray());
+                if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to patch {ID} ({path})", content.Id, content.VersionMeta?.Path);
+            }
         }
     }
 
