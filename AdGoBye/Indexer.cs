@@ -287,7 +287,7 @@ public class Indexer
             {
                 Logger.Error(e,
                     "Plugin {Name} ({Maintainer}) v{Version} threw an exception while patching {ID} ({path})",
-                    plugin.Name, plugin.Maintainer, plugin.Version, content.Id, content.VersionMeta?.Path);
+                    plugin.Name, plugin.Maintainer, plugin.Version, content.Id, content.VersionMeta.Path);
             }
         }
 
@@ -304,7 +304,7 @@ public class Indexer
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Failed to patch {ID} ({path})", content.Id, content.VersionMeta?.Path);
+                Logger.Error(e, "Failed to patch {ID} ({path})", content.Id, content.VersionMeta.Path);
             }
         }
     }
