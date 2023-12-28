@@ -171,6 +171,8 @@ public class Indexer
             // The first is a world Unity version upgrade, in that case we simply use the newer version
             case ContentType.World:
                 if (!IsWorldHigherUnityVersion(indexCopy, content)) return;
+                Logger.Information("Upgrading {id} since it bumped Unity version ({directory})",
+                    indexCopy.Id, content.VersionMeta.Path);
                 indexCopy.VersionMeta.Version = content.VersionMeta.Version;
                 indexCopy.VersionMeta.Path = content.VersionMeta.Path;
                 indexCopy.VersionMeta.PatchedBy = [];
@@ -223,7 +225,7 @@ public class Indexer
         {
             AssetsManager manager = new();
             var bundleInstance = manager.LoadBundleFile(path + "/__data");
-            var assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 0);
+            var assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 1);
 
             foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoBehaviour))
             {
@@ -232,7 +234,8 @@ public class Indexer
                 return monoScriptBase["unityVersion"].AsString;
             }
 
-            return "";
+            Logger.Fatal("ResolveUnityVersion: Unable to parse unityVersion out for {path}", path);
+            throw new InvalidOperationException();
         }
     }
 
