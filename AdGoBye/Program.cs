@@ -1,5 +1,6 @@
 using AdGoBye;
 using AdGoBye.Plugins;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -18,6 +19,10 @@ Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
     .CreateLogger();
 var logger = Log.ForContext(typeof(Program));
 
+await using var db = new IndexContext();
+db.Database.Migrate();
+Indexer.ManageIndex();
+
 PluginLoader.LoadPlugins();
 foreach (var plugin in PluginLoader.LoadedPlugins)
 {
@@ -31,20 +36,22 @@ foreach (var plugin in PluginLoader.LoadedPlugins)
 
 if (Blocklist.Blocks.Count == 0) logger.Information("No blocklist has been loaded, is this intentional?");
 logger.Information("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
-    Blocklist.Blocks.Count, Indexer.Index.Count);
+    Blocklist.Blocks.Count, db.Content.Count());
 
-foreach (var content in Indexer.Index)
-{
+foreach (var content in db.Content.Include(content => content.VersionMeta ))
+{   
     if (content.Type != ContentType.World) continue;
+    logger.Information("Processing {ID} ({director})", content.Id, content.VersionMeta.Path);
     Indexer.PatchContent(content);
 }
+
+db.SaveChanges();
 
 #pragma warning disable CS4014
 if (Settings.Options.EnableLive)
 {
     Task.Run(() => Live.WatchNewContent(Indexer.WorkingDirectory));
     Task.Run(() => Live.WatchLogFile(Indexer.WorkingDirectory));
-    Task.Run(Live.SaveCachePeriodically);
     await Task.Delay(Timeout.Infinite).ConfigureAwait(false);
 }
 #pragma warning restore CS4014

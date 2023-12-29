@@ -31,6 +31,13 @@ public static class Live
           This might also break if the detection failure is caused intentionally by adversarial motive.
  */
         watcher.Created += (_, e) => Task.Run(() => ParseFile(e.FullPath.Replace("__info", "__data")));
+        watcher.Deleted += (_, e) => Task.Run(
+            () =>
+            {
+                Logger.Verbose("File removal: {directory}", e.FullPath);
+                Indexer.RemoveFromIndex(e.FullPath.Replace("__info", "__data"));
+            });
+
         watcher.Error += (_, e) =>
         {
             Logger.Error("{source}: {exception}", e.GetException().Message, e.GetException().Message);
@@ -47,34 +54,16 @@ public static class Live
 
     private static async void ParseFile(string path)
     {
-        Logger.Verbose("File creation: {directory}", path);
         var done = false;
         while (!done)
         {
             try
             {
-                var content = Indexer.ParseFile(path);
-                if (content is null)
-                {
-                    Logger.Debug("{path} was null", path);
-                    return;
-                }
-
-                Indexer.Index.Add(content);
-                Logger.Information("Adding to index: {id} ({type})", content.Id, content.Type);
-
-                if (content.Type is ContentType.World)
-                {
-                    Logger.Verbose("Live patching world after lock is released… ({id})", content.Id);
-                    // Unity doesn't hold a lock on the file.
-                    // If we attempt to patch the file during load, we may overwrite the file while
-                    // the client loading the world, causing corruption and the client to crash.
-                    Ewh.WaitOne();
-                    Indexer.PatchContent(content);
-                }
-
+                Indexer.AddToIndex(path);
+                Ewh.WaitOne();
+                Indexer.PatchContent(Indexer.GetFromIndex(path)!);
                 done = true;
-            }
+            }   
             catch (EndOfStreamException)
             {
                 await Task.Delay(500);
@@ -82,13 +71,6 @@ public static class Live
         }
     }
 
-    public static void SaveCachePeriodically()
-    {
-        var timer = new System.Timers.Timer(300000);
-        timer.Elapsed += (_, _) => Indexer.WriteIndexToDisk();
-        timer.AutoReset = true;
-        timer.Enabled = true;
-    }
 
     [SuppressMessage("ReSharper", "MethodSupportsCancellation")]
     public static void WatchLogFile(string path)
