@@ -95,7 +95,7 @@ disrupt worlds and require them to diagnose those issues.
 
 ## Use only one table format
 
-Due to a [possible bug(?)](https://github.com/xoofx/Tomlyn/issues/74) in Tomlyn, you cannot mix the inline and
+Due to a [possible TOML limitation](https://github.com/xoofx/Tomlyn/issues/74), you cannot mix the inline and
 non-inline format:
 
 ```toml
@@ -183,8 +183,7 @@ That limitation is fine for worlds, but this won't work if loading the avatar mi
 Even then, we match using IDs, so if the avatar gets ripped or re-uploaded, the block won't work.
 
 But please don't do this either way:
-Often when you see someone, you don't say `That's Regalia's Avatar`, you say `That's Regalia` (
-see [Identity, Gender, and VRChat](https://youtu.be/5v_Dl7i4Bcw)).
+Often when you see someone, you don't say `That's Regalia's Avatar`, you say `That's Regalia` (see [this video](https://youtu.be/5v_Dl7i4Bcw)).
 Avatars are personal to people because you inhabit and exist within an avatar, they are direct representations of
 people.
 If you edit someone else's Avatar like this, you are directly choosing how that person should be able to express
