@@ -110,6 +110,7 @@ public static class Blocklist
         // [Test this] Assumption: Relevant index is always at 1
         var assetFileInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 1);
         var assetFile = assetFileInstance.file;
+        var patchedGameObjects = new List<GameObjectInstance>();
 
         foreach (var gameObject in assetFile.GetAssetsOfType(AssetClassID.GameObject))
         {
@@ -124,13 +125,19 @@ public static class Blocklist
                     if (!ProcessPositionAndParent(blocklistGameObject, baseGameObject, assetFileInstance)) continue;
                 }
 
-                Logger.Debug("Found {gameObjectName}, disabling", blocklistGameObject.Name);
                 baseGameObject["m_IsActive"].AsBool = false;
                 gameObject.SetNewData(baseGameObject);
                 bundle.BlockAndDirInfo.DirectoryInfos[1].SetNewData(assetFile);
+                patchedGameObjects.Add(blocklistGameObject);
+                Logger.Debug("Found and disabled {gameObjectName}", blocklistGameObject.Name);
             }
         }
-        
+
+        if (patchedGameObjects.Count != 0)
+            Logger.Warning(
+                "Following blocklist objects weren't disabled: {@UnpatchedList}" +
+                "\nThis can mean that these blocklist entries are outdated, consider informing the maintainer",
+                gameObjectsToDisable.Except(patchedGameObjects));
         if (Settings.Options.DryRun) return;
         Logger.Information("Done, writing changes as bundle");
         using var writer = new AssetsFileWriter(assetPath + ".clean");
@@ -205,4 +212,3 @@ public static class Blocklist
         }
     }
 }
-
