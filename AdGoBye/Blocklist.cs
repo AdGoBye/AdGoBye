@@ -133,11 +133,12 @@ public static class Blocklist
             }
         }
 
-        if (patchedGameObjects.Count != 0)
+        var unpatchedObjects = gameObjectsToDisable.Except(patchedGameObjects).ToList();
+        if (unpatchedObjects.Count != 0)
             Logger.Warning(
                 "Following blocklist objects weren't disabled: {@UnpatchedList}" +
                 "\nThis can mean that these blocklist entries are outdated, consider informing the maintainer",
-                gameObjectsToDisable.Except(patchedGameObjects));
+                unpatchedObjects);
         if (Settings.Options.DryRun) return;
         Logger.Information("Done, writing changes as bundle");
         using var writer = new AssetsFileWriter(assetPath + ".clean");
