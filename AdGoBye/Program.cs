@@ -1,6 +1,6 @@
 using AdGoBye;
-using AdGoBye.Plugins;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -12,46 +12,28 @@ var levelSwitch = new LoggingLevelSwitch
     MinimumLevel = (LogEventLevel)Settings.Options.LogLevel
 };
 
-Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.ControlledBy(levelSwitch)
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+    .Enrich.FromLogContext()
     .WriteTo.Console(new ExpressionTemplate(
-        "[{@t:HH:mm:ss} {@l:u3} {Coalesce(Substring(SourceContext, LastIndexOf(SourceContext, '.') + 1),'<none>')}] {@m}\n{@x}",
+        "[{@t:HH:mm:ss} {@l:u3} {Coalesce(SourceContext,'<none>')}] {@m}\n{@x}",
         theme: TemplateTheme.Literate))
     .CreateLogger();
-var logger = Log.ForContext(typeof(Program));
 
-await using var db = new IndexContext();
-db.Database.Migrate();
-Indexer.ManageIndex();
+var builder = Host.CreateDefaultBuilder(args)
+    
+    .ConfigureServices(collection =>
+    {
+        collection.AddDbContext<IndexContext>();
+        collection.AddSerilog();
+        collection.AddSingleton<Indexer>();
+        collection.AddSingleton<SharedStateService>();
+    });
 
-PluginLoader.LoadPlugins();
-foreach (var plugin in PluginLoader.LoadedPlugins)
-{
-    logger.Information("Plugin {Name} ({Maintainer}) v{Version} is loaded.", plugin.Name, plugin.Maintainer,
-        plugin.Version);
-    logger.Information("Plugin type: {Type}", plugin.Instance.PluginType());
 
-    if (plugin.Instance.PluginType() == EPluginType.ContentSpecific)
-        logger.Information("Responsible for {IDs}", plugin.Instance.ResponsibleForContentIds());
-}
+using var host = builder.Build();
+var awa = host.Services.GetRequiredService<Indexer>();
+awa.ManageIndex();
 
-if (Blocklist.Blocks.Count == 0) logger.Information("No blocklist has been loaded, is this intentional?");
-logger.Information("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
-    Blocklist.Blocks.Count, db.Content.Count());
-
-foreach (var content in db.Content.Include(content => content.VersionMeta ))
-{   
-    if (content.Type != ContentType.World) continue;
-    logger.Information("Processing {ID} ({director})", content.Id, content.VersionMeta.Path);
-    Indexer.PatchContent(content);
-}
-
-db.SaveChanges();
-
-#pragma warning disable CS4014
-if (Settings.Options.EnableLive)
-{
-    Task.Run(() => Live.WatchNewContent(Indexer.WorkingDirectory));
-    Task.Run(() => Live.WatchLogFile(Indexer.WorkingDirectory));
-    await Task.Delay(Timeout.Infinite).ConfigureAwait(false);
-}
-#pragma warning restore CS4014
+host.Run();

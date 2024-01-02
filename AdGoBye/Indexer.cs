@@ -5,8 +5,8 @@ using System.Runtime.InteropServices;
 using AdGoBye.Plugins;
 using AssetsTools.NET.Extra;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
-using Serilog;
 using DbContext = Microsoft.EntityFrameworkCore.DbContext;
 
 namespace AdGoBye;
@@ -37,27 +37,20 @@ public record Content
     }
 }
 
-public sealed class IndexContext : DbContext
+public class IndexContext(DbContextOptions<IndexContext> options) : DbContext(options)
 {
     protected override void OnConfiguring(DbContextOptionsBuilder options)
     {
         options.UseSqlite("Data Source=database.db");
     }
-
-#pragma warning disable CS8618 //
-    public DbSet<Content> Content { get; set; }
-    public DbSet<Content.ContentVersionMeta> ContentVersionMetas { get; set; }
-#pragma warning restore CS8618
+    public DbSet<Content> Content { get; set; } = null!;
+    public DbSet<Content.ContentVersionMeta> ContentVersionMetas { get; set; } = null!;
 }
 
-public class Indexer
+public class Indexer(ILogger<Indexer> logger, IndexContext db)
 {
-    private static readonly ILogger Logger = Log.ForContext(typeof(Indexer));
-    public static readonly string WorkingDirectory = GetWorkingDirectory();
-
-    public static void ManageIndex()
+    public void ManageIndex()
     {
-        using var db = new IndexContext();
         if (db.Content.Any()) VerifyDbTruth();
         var contentFolders = new DirectoryInfo(GetCacheDir()).GetDirectories();
         if (contentFolders.Length == db.Content.Count() - SafeAllowlistCount()) return;
@@ -69,7 +62,7 @@ public class Indexer
             AddToIndex(latestVersion.FullName);
         }
 
-        Logger.Information("Finished Index processing");
+        logger.Log(LogLevel.Information, "Finished Index processing");
         return;
 
         static int SafeAllowlistCount()
@@ -78,9 +71,8 @@ public class Indexer
         }
     }
 
-    private static void VerifyDbTruth()
+    private void VerifyDbTruth()
     {
-        using var db = new IndexContext();
         foreach (var content in db.Content.Include(content => content.VersionMeta))
         {
             var directoryMeta = new DirectoryInfo(content.VersionMeta.Path);
@@ -97,7 +89,7 @@ public class Indexer
             if (!File.Exists(highestVersionDir!.FullName + "/__data"))
             {
                 db.Remove(content);
-                Log.Warning(
+                logger.Log(LogLevel.Warning,
                     "{directory} is highest version but doesn't have __data, hell might have frozen over. Removed from Index",
                     highestVersionDir.FullName);
                 continue;
@@ -112,9 +104,8 @@ public class Indexer
         db.SaveChanges();
     }
 
-    public static void AddToIndex(string path)
+    public void AddToIndex(string path)
     {
-        using var db = new IndexContext();
         //   - Folder (StableContentName) [singleton, we want this]
         //       - Folder (version) [may exist multiple times] 
         //          - __info
@@ -131,7 +122,7 @@ public class Indexer
             var version = GetVersion(directory!.Name);
             if (version < content.VersionMeta.Version)
             {
-                Logger.Verbose(
+                logger.Log(LogLevel.Trace,
                     "Skipped Indexation of {directory} since it isn't an upgrade (Index: {greaterVersion}, Parsed: {lesserVersion})",
                     directory.FullName, content.VersionMeta.Version, version);
                 return;
@@ -155,12 +146,13 @@ public class Indexer
         {
             if (content.Type is ContentType.Avatar && IsAvatarImposter(content.VersionMeta.Path))
             {
-                Logger.Information("Skipping {path} because it's an Imposter avatar", content.VersionMeta.Path);
+                logger.Log(LogLevel.Information, "Skipping {path} because it's an Imposter avatar",
+                    content.VersionMeta.Path);
                 return;
             }
 
             db.Content.Add(content);
-            Logger.Information("Added {id} [{type}] to Index", content.Id, content.Type);
+            logger.Log(LogLevel.Information, "Added {id} [{type}] to Index", content.Id, content.Type);
             db.SaveChanges();
             return;
         }
@@ -171,7 +163,7 @@ public class Indexer
             // The first is a world Unity version upgrade, in that case we simply use the newer version
             case ContentType.World:
                 if (!IsWorldHigherUnityVersion(indexCopy, content)) return;
-                Logger.Information("Upgrading {id} since it bumped Unity version ({directory})",
+                logger.Log(LogLevel.Information, "Upgrading {id} since it bumped Unity version ({directory})",
                     indexCopy.Id, content.VersionMeta.Path);
                 indexCopy.VersionMeta.Version = content.VersionMeta.Version;
                 indexCopy.VersionMeta.Path = content.VersionMeta.Path;
@@ -182,7 +174,8 @@ public class Indexer
             case ContentType.Avatar:
                 if (IsAvatarImposter(content.VersionMeta.Path))
                 {
-                    Logger.Information("Skipping {path} because it's an Imposter avatar", content.VersionMeta.Path);
+                    logger.Log(LogLevel.Information, "Skipping {path} because it's an Imposter avatar",
+                        content.VersionMeta.Path);
                     return;
                 }
 
@@ -210,7 +203,7 @@ public class Indexer
             return false;
         }
 
-        static bool IsWorldHigherUnityVersion(Content IndexedContent, Content newContent)
+        bool IsWorldHigherUnityVersion(Content IndexedContent, Content newContent)
         {
             // Hack: [Regalia 2023-12-25T03:33:18Z] I'm not paid enough to parse Unity version strings reliably
             // This assumes the Unity versions always contains the major version at the start, is seperated by a dot and 
@@ -221,7 +214,7 @@ public class Indexer
             return int.Parse(newContentVersion) > int.Parse(indexedContentVersion);
         }
 
-        static string ResolveUnityVersion(string path)
+        string ResolveUnityVersion(string path)
         {
             AssetsManager manager = new();
             var bundleInstance = manager.LoadBundleFile(path + "/__data");
@@ -234,33 +227,29 @@ public class Indexer
                 return monoScriptBase["unityVersion"].AsString;
             }
 
-            Logger.Fatal("ResolveUnityVersion: Unable to parse unityVersion out for {path}", path);
+            logger.Log(LogLevel.Critical, "ResolveUnityVersion: Unable to parse unityVersion out for {path}", path);
             throw new InvalidOperationException();
         }
     }
 
 
-    public static Content? GetFromIndex(string path)
+    public Content? GetFromIndex(string path)
     {
-        using var db = new IndexContext();
         var directory = new DirectoryInfo(path);
         return db.Content.Include(content => content.VersionMeta)
             .FirstOrDefault(content => content.StableContentName == directory.Parent!.Parent!.Name);
     }
 
-    public static void RemoveFromIndex(string path)
+    public void RemoveFromIndex(string path)
     {
-        using var db = new IndexContext();
         var indexMatch = GetFromIndex(path);
         if (indexMatch is null) return;
-
-
         db.Content.Remove(indexMatch);
         db.SaveChanges();
-        Logger.Information("Removed {id} from Index", indexMatch.Id);
+        logger.Log(LogLevel.Information, "Removed {id} from Index", indexMatch.Id);
     }
 
-    public static void PatchContent(Content content)
+    public void PatchContent(Content content)
     {
         if (content.Type is not ContentType.World) return;
 
@@ -288,7 +277,7 @@ public class Indexer
             }
             catch (Exception e)
             {
-                Logger.Error(e,
+                logger.Log(LogLevel.Error, e,
                     "Plugin {Name} ({Maintainer}) v{Version} threw an exception while patching {ID} ({path})",
                     plugin.Name, plugin.Maintainer, plugin.Version, content.Id, content.VersionMeta.Path);
             }
@@ -307,7 +296,7 @@ public class Indexer
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Failed to patch {ID} ({path})", content.Id, content.VersionMeta.Path);
+                logger.Log(LogLevel.Error, e, "Failed to patch {ID} ({path})", content.Id, content.VersionMeta.Path);
             }
         }
     }
@@ -327,7 +316,7 @@ public class Indexer
         return new Tuple<DirectoryInfo?, int>(highestVersionDir, highestVersion);
     }
 
-    private static Content? FileToContent(DirectoryInfo pathToFile)
+    private Content? FileToContent(DirectoryInfo pathToFile)
     {
         string id;
         int type;
@@ -354,7 +343,7 @@ public class Indexer
         };
     }
 
-    public static Tuple<string, int>? ParseFileMeta(string path)
+    public Tuple<string, int>? ParseFileMeta(string path)
     {
         AssetsManager manager = new();
         BundleFileInstance bundleInstance;
@@ -366,7 +355,7 @@ public class Indexer
         catch (NotImplementedException e)
         {
             if (e.Message != "Cannot handle bundles with multiple block sizes yet.") throw;
-            Logger.Warning(
+            logger.Log(LogLevel.Warning,
                 "{directory} has multiple block sizes, AssetsTools can't handle this yet. Skipping... ",
                 path);
             return null;
@@ -390,7 +379,7 @@ public class Indexer
 
         if (assetInstance is null)
         {
-            Logger.Warning(
+            logger.Log(LogLevel.Warning,
                 "Indexing {directory} caused no loadable bundle directory to exist, is this bundle valid?",
                 path);
             return null;
@@ -405,13 +394,13 @@ public class Indexer
         {
             if (gameObjectBase["blueprintId"].AsString == "")
             {
-                Log.Warning("{directory} has no embedded ID for some reason, skipping this…", path);
+                logger.Log(LogLevel.Warning,"{directory} has no embedded ID for some reason, skipping this…", path);
                 return null;
             }
 
             if (gameObjectBase["contentType"].AsInt >= 3)
             {
-                Logger.Warning(
+                logger.Log(LogLevel.Warning,
                     "{directory} is neither Avatar nor World but another secret other thing ({type}), skipping this...",
                     path, gameObjectBase["contentType"].AsInt);
                 return null;
@@ -442,7 +431,7 @@ public class Indexer
 
 
     [SuppressMessage("ReSharper", "StringLiteralTypo")]
-    private static string GetWorkingDirectory()
+    public string GetWorkingDirectory()
     {
         if (!string.IsNullOrEmpty(Settings.Options.WorkingFolder)) return Settings.Options.WorkingFolder;
         var appName = GetApplicationName();
@@ -458,7 +447,7 @@ public class Indexer
         return appDataFolder + pathToCache;
     }
 
-    private static string GetApplicationName()
+    private string GetApplicationName()
     {
         const string appid = "438100";
 
@@ -497,17 +486,17 @@ public class Indexer
             var words = line.Split("\t");
             return words[3].Replace("\"", "");
         }
-
-        void DieFatally(Exception e)
-        {
-            Logger.Fatal("We're unable to find your game's working folder (the folder above the cache), " +
-                         "please provide it manually in appsettings.json as 'WorkingFolder'.");
-            throw e;
-        }
     }
 
-    private static string GetCacheDir()
+    void DieFatally(Exception e)
     {
-        return WorkingDirectory + "/Cache-WindowsPlayer/";
+        logger.Log(LogLevel.Critical,"We're unable to find your game's working folder (the folder above the cache), " +
+                                  "please provide it manually in appsettings.json as 'WorkingFolder'.");
+        throw e;
+    }
+
+    private string GetCacheDir()
+    {
+        return GetWorkingDirectory() + "/Cache-WindowsPlayer/";
     }
 }
