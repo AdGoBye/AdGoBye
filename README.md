@@ -6,34 +6,37 @@ Over the years, advertisements have slowly snuck their way into worlds at a pace
 before. Creators of worlds are handed silly sums of money. This would be fine, advertisements, however, slowly reached an
 excessive amount.
 
-![img.png](Marketing%2Fimg.png)
+![Movie & Chill has ads everywhere you can see](Marketing/mc.webp)
 No offense to the creator of Movie & Chill, but almost every wall has at least one advertisement.
 
+![AGB disabling M&C posters](Marketing/mcbeforeafter.webp)
+![AGB disabling LSM posters](Marketing/lsmbeforeafter.webp)
 ## Architecture
 
-AGB works by modifying AssetBundles in the Cache folder, the GameObjects in Worlds have known names that remain
-mostly static, therefore, we can either remove or disable them.
+AGB works by modifying Worlds in the Cache folder, Worlds have known object names that remain static, therefore,
+we can disable and modify them.
 
 AGB has two methods for this: Blocklists and Plugins
 
-### Blocklist
+### Blocklists
 
 We want to give users the choice of what to hide by borrowing a mechanism similar to uBlock Origin's Filter lists.
 
-Blocklists contain the World IDs (`wrld_*`) with the names of GameObjects to disable, AGB then disables these
-objects.
+Blocklists contain the World IDs (`wrld_*`) with the names of objects to disable, AGB then disables these objects.
 
-We will provide first-party blocklists (which are entirely opinionated by the AGB authors), but we allow users to
-load their own blocklists instead.
+We provide first-party blocklists (which are entirely opinionated by the AGB authors) [here](https://github.com/AdGoBye/AdGoBye-Blocklists), but you can load and
+maintain your own blocklists. 
+
+[Contributing](https://github.com/AdGoBye/AdGoBye/blob/main/CONTRIBUTING.md#blocklist-guidelines) contains additional
+information and guidelines on how to do this.
 
 ### Plugins
 
 Certain worlds require more work than just disabling GameObjects (texture swaps, removing String / Image loaders), which
-might require specialized code.
-Because of this, Plugins allow users to load custom code to modify worlds.
+might require specialized code. For these cases, Plugins allow users to load custom code to modify worlds.
 
-While we internally use [AssetTools.net](https://github.com/nesrak1/AssetsTools.NET), plugins are able to use their own
-code.
+[Contributing](https://github.com/AdGoBye/AdGoBye/blob/main/CONTRIBUTING.md#plugins) contains additional information on
+how to do this.
 
 ## Ethics
 
@@ -49,22 +52,9 @@ is not compatible with reality; worlds get updated which might introduce ads.
 
 There is seemingly no end to this wave of ads. In fact, their proliferation seems to imply that they're successful.
 Names like Flirtual and Nevermet get away with no repercussions for preying on the socially awkward.
-![Two advertisements for Flirtual and Nevermet that market themselves for making friends](Marketing/datingads.png)
+![Two advertisements for Flirtual and Nevermet that market themselves for 'making friends'](Marketing/datingads.webp)
 
-During the EAC mod purge, it was justified that external tooling like mods impedes the vision of world creators.
-While that is valid to a degree, the question is where this ends:
-
-[rainyrooftop_nevermet.webm](https://github.com/AdGoBye/AdGoBye/assets/126194895/cea32092-e58c-460c-bd55-e8a4db05f635)
-
-
-
-<Sub>this guy must have startled everybody at least once</sub>
-
-While these ads may fund the creator, they come to the detriment of the users who actually inhabit the world.
-
-AdGoBye allows those who are interested in taking back their virtual reality real estate to do so.
-
-<br/><br/>
+### World creators
 
 If you're a world creator, and you have ads that AGB blocks,
 you are likely being paid a flat rate for the ads existing in your world.
@@ -82,18 +72,27 @@ you have spent your hard time working on, it's not for the mutual benefit of bot
 And if a user wants to see your world as-is, they can use the Allowlist feature provided which will skip your world
 based on ID from being indexed.
 
-But for the love of god, please oppose actors like [Adlily](https://adli.ly) (fyi, website has tracking) who are
-seeking to profit from this community we've built.
-That use new tools provided by the game, not the novel uses that push this medium forward but drag us back to the
-current Internet dark age
-by [spying and tracking users](https://web.archive.org/web/20231120221251/https://adli.ly/analytics/retention).
-All for meaningless statistics like "ad retention"
-or ["impressions"](https://web.archive.org/web/20231015041525/https://adli.ly/faq#whats-an-impression)
-that disregard the humanity of you and your users.
+### The Future
+Features that skew control into the hands of users get rejected to avoid impeding creator vision. 
+This is valid up to a point, however, we have reached a new era.
 
-These people are not your friends;
-they are entrepreneurs exploiting your creativity and goodwill as a vehicle to make money off you.
-By turning your work into a billboard.
+World creators are being handed hundreds of US dollars to feature dating app ads into their worlds,
+making the creator's vision less impartial than ever before.
 
-<br/><br/>
-You deserve better than that.
+Never before have we had solutions like [Adlily](https://adli.ly) (fyi, website has tracking) in the limelight that
+attempted to profit so explicitly off creators
+by [spying on users](https://web.archive.org/web/20231120221251/https://adli.ly/analytics/retention) in complete
+[disregard for the privacy of users](https://github.com/AdGoBye/AdGoBye/issues/18#issuecomment-1854959379).
+
+While that project might be dead now, the addition of CE has caused an unprecedented first-party focus on the
+commercialization of worlds.
+![Black Cat selling the video player](Marketing/catstore.webp)
+![VirtualFurence selling Admin Flight](Marketing/vf.webp)
+A commercialization that encourages taking away quality of life features from users to profit from them and creating
+caste systems which previously had no legitimacy.
+
+
+The features being introduced have opened Pandora's box to a race to the bottom, in which both world creators and their
+users receive less.
+
+AdGoBye allows us to non-intrusively reclaim spaces tainted by this, creating more comfortable environments.
