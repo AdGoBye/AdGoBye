@@ -90,7 +90,7 @@ public static class Blocklist
         {
             if (!deduplicatedBlocklist.TryGetValue(block.WorldId!, out _))
             {
-                deduplicatedBlocklist.Add(block.WorldId!, new HashSet<GameObjectInstance>(block.GameObjects!));
+                deduplicatedBlocklist.Add(block.WorldId!, [..block.GameObjects!]);
                 continue;
             }
 

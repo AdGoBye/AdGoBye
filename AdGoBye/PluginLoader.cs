@@ -8,7 +8,7 @@ namespace AdGoBye;
 public static class PluginLoader
 {
     private static readonly ILogger Logger = Log.ForContext(typeof(PluginLoader));
-    public static List<PluginEntry> LoadedPlugins = new();
+    public static List<PluginEntry> LoadedPlugins = [];
 
     public static void LoadPlugins()
     {
