@@ -84,6 +84,12 @@ attempted to profit so explicitly off creators
 by [spying on users](https://web.archive.org/web/20231120221251/https://adli.ly/analytics/retention) in complete
 [disregard for the privacy of users](https://github.com/AdGoBye/AdGoBye/issues/18#issuecomment-1854959379).
 
-While that project might be dead now, world creators are finding new ways to inflict the same damage on the users experience.
+While that project might be dead now, world creators are finding new ways to inflict the same damage on the users
+experience.
 
-AdGoBye allows us to non-intrusively reclaim spaces tainted by this, creating more comfortable environments.
+AdGoBye allows us to non-intrusively reclaim spaces tainted from this by tweaking them into more comfortable versions.
+While creator vision should at the very least be considered, we think that AGB creates a healthier dynamic between
+creators and users by giving the choice of what parts of worlds users consider valuable.
+
+The Plugin system alone has virtually no bounds as long as it can be done within AssetsTools, potentially enabling new
+forms of user expression without requiring new features from the game or work from creators.
