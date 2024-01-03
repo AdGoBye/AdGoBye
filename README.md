@@ -84,15 +84,6 @@ attempted to profit so explicitly off creators
 by [spying on users](https://web.archive.org/web/20231120221251/https://adli.ly/analytics/retention) in complete
 [disregard for the privacy of users](https://github.com/AdGoBye/AdGoBye/issues/18#issuecomment-1854959379).
 
-While that project might be dead now, the addition of CE has caused an unprecedented first-party focus on the
-commercialization of worlds.
-![Black Cat selling the video player](Marketing/catstore.webp)
-![VirtualFurence selling Admin Flight](Marketing/vf.webp)
-A commercialization that encourages taking away quality of life features from users to profit from them and creating
-caste systems which previously had no legitimacy.
-
-
-The features being introduced have opened Pandora's box to a race to the bottom, in which both world creators and their
-users receive less.
+While that project might be dead now, world creators are finding new ways to inflict the same damage on the users experience.
 
 AdGoBye allows us to non-intrusively reclaim spaces tainted by this, creating more comfortable environments.
