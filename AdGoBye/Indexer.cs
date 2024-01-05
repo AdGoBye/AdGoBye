@@ -5,7 +5,9 @@ using System.Runtime.InteropServices;
 using AdGoBye.Plugins;
 using AssetsTools.NET.Extra;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Win32;
 using DbContext = Microsoft.EntityFrameworkCore.DbContext;
 
@@ -43,12 +45,15 @@ public class IndexContext(DbContextOptions<IndexContext> options) : DbContext(op
     {
         options.UseSqlite("Data Source=database.db");
     }
+
     public DbSet<Content> Content { get; set; } = null!;
     public DbSet<Content.ContentVersionMeta> ContentVersionMetas { get; set; } = null!;
 }
 
-public class Indexer(ILogger<Indexer> logger, IndexContext db)
+public class Indexer(ILogger<Indexer> logger, Blocklist blocklist, IndexContext db, IOptions<Settings> options)
 {
+    private readonly Settings _options = options.Value;
+
     public void ManageIndex()
     {
         if (db.Content.Any()) VerifyDbTruth();
@@ -65,9 +70,9 @@ public class Indexer(ILogger<Indexer> logger, IndexContext db)
         logger.Log(LogLevel.Information, "Finished Index processing");
         return;
 
-        static int SafeAllowlistCount()
+        int SafeAllowlistCount()
         {
-            return Settings.Options.Allowlist is not null ? Settings.Options.Allowlist.Length : 0;
+            return _options.Allowlist?.Length ?? 0;
         }
     }
 
@@ -273,7 +278,7 @@ public class Indexer(ILogger<Indexer> logger, IndexContext db)
                     pluginApplies = false;
 
                 if (pluginApplies) plugin.Instance.Patch(content.Id, content.VersionMeta.Path);
-                if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add(plugin.Name);
+                if (!_options.DryRun) content.VersionMeta.PatchedBy.Add(plugin.Name);
             }
             catch (Exception e)
             {
@@ -284,15 +289,15 @@ public class Indexer(ILogger<Indexer> logger, IndexContext db)
         }
 
         // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract - False positive
-        if (Blocklist.Blocks is null) return;
+        if (blocklist.Blocks is null) return;
         if (pluginOverridesBlocklist) return;
         if (content.VersionMeta.PatchedBy.Contains("Blocklist")) return;
-        foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
+        foreach (var block in blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
         {
             try
             {
-                Blocklist.Patch(content.VersionMeta.Path + "/__data", block.Value.ToArray());
-                if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
+                blocklist.Patch(content.VersionMeta.Path + "/__data", block.Value.ToArray());
+                if (!_options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
             }
             catch (Exception e)
             {
@@ -394,7 +399,7 @@ public class Indexer(ILogger<Indexer> logger, IndexContext db)
         {
             if (gameObjectBase["blueprintId"].AsString == "")
             {
-                logger.Log(LogLevel.Warning,"{directory} has no embedded ID for some reason, skipping this…", path);
+                logger.Log(LogLevel.Warning, "{directory} has no embedded ID for some reason, skipping this…", path);
                 return null;
             }
 
@@ -433,7 +438,7 @@ public class Indexer(ILogger<Indexer> logger, IndexContext db)
     [SuppressMessage("ReSharper", "StringLiteralTypo")]
     public string GetWorkingDirectory()
     {
-        if (!string.IsNullOrEmpty(Settings.Options.WorkingFolder)) return Settings.Options.WorkingFolder;
+        if (!string.IsNullOrEmpty(_options.WorkingFolder)) return _options.WorkingFolder;
         var appName = GetApplicationName();
         var pathToCache = "/" + appName + "/" + appName + "/";
 
@@ -490,8 +495,8 @@ public class Indexer(ILogger<Indexer> logger, IndexContext db)
 
     void DieFatally(Exception e)
     {
-        logger.Log(LogLevel.Critical,"We're unable to find your game's working folder (the folder above the cache), " +
-                                  "please provide it manually in appsettings.json as 'WorkingFolder'.");
+        logger.Log(LogLevel.Critical, "We're unable to find your game's working folder (the folder above the cache), " +
+                                      "please provide it manually in appsettings.json as 'WorkingFolder'.");
         throw e;
     }
 
