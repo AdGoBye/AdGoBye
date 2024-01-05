@@ -4,26 +4,23 @@ using Serilog;
 // ReSharper disable FunctionNeverReturns
 namespace AdGoBye;
 
-public interface ISharedStateService
+
+public class SharedStateService
 {
-    EventWaitHandle Ewh { get; set; }
+    public EventWaitHandle Ewh { get; set; } = new(false, EventResetMode.ManualReset);
 }
-public class SharedStateService(EventWaitHandle ewh) : ISharedStateService
-{
-    public EventWaitHandle Ewh { get; set; } = ewh;
-}
-public class LogWatcher(ILogger logger, EventWaitHandle Ewh, Indexer _indexer)
+public class LogWatcher(ILogger logger, SharedStateService Ewh, Indexer _indexer) : BackgroundService
 {
     private const string LoadStartIndicator = "[Behaviour] Preparing assets...";
     private const string LoadStopIndicator = "Entering world";
 
     [SuppressMessage("ReSharper", "MethodSupportsCancellation")]
-    public void WatchLogFile(string path)
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         CancellationTokenSource ct = new();
-        var currentTask = Task.Run(() => HandleFileLock(GetNewestLog(), ct.Token));
+        var currentTask = Task.Run(() => HandleFileLock(GetNewestLog(), ct.Token), CancellationToken.None);
 
-        using var watcher = new FileSystemWatcher(path);
+        using var watcher = new FileSystemWatcher(_indexer.GetWorkingDirectory());
         watcher.NotifyFilter = NotifyFilters.FileName;
         watcher.Created += (_, e) =>
         {
@@ -33,7 +30,7 @@ public class LogWatcher(ILogger logger, EventWaitHandle Ewh, Indexer _indexer)
 
             // Assuming a new log file means a client restart, it's likely not loading any file.
             // Let's take initiative and free any tasks.
-            Ewh.Set();
+            Ewh.Ewh.Set();
 
             currentTask = Task.Run(() => HandleFileLock(e.FullPath, ct.Token));
             logger.Verbose("Rotated log parsing to {file}", e.Name);
@@ -61,11 +58,11 @@ public class LogWatcher(ILogger logger, EventWaitHandle Ewh, Indexer _indexer)
                 {
                     case not null when line.Contains(LoadStartIndicator):
                         logger.Verbose("Expecting world load: {msg}", line);
-                        Ewh.Reset();
+                        Ewh.Ewh.Reset();
                         break;
                     case not null when line.Contains(LoadStopIndicator):
                         logger.Verbose("Expecting world load finish: {msg}", line);
-                        Ewh.Set();
+                        Ewh.Ewh.Set();
                         break;
                 }
             }
@@ -89,9 +86,9 @@ public class LogWatcher(ILogger logger, EventWaitHandle Ewh, Indexer _indexer)
     }
 }
 
-public class ContentWatcher(Indexer indexer, ILogger logger, WaitHandle Ewh) : IHostedService
+public class ContentWatcher(Indexer indexer, ILogger logger, SharedStateService Ewh) : BackgroundService
 {
-    public Task StartAsync(CancellationToken cancellationToken)
+    protected override Task ExecuteAsync(CancellationToken cancellationToken) 
     {
         using var watcher = new FileSystemWatcher(indexer.GetWorkingDirectory());
 
@@ -130,12 +127,6 @@ public class ContentWatcher(Indexer indexer, ILogger logger, WaitHandle Ewh) : I
             watcher.WaitForChanged(WatcherChangeTypes.Created, Timeout.Infinite);
         }
     }
-
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        throw new NotImplementedException();
-    }
-
     private async void ParseFile(string path)
     {
         var done = false;
@@ -144,7 +135,7 @@ public class ContentWatcher(Indexer indexer, ILogger logger, WaitHandle Ewh) : I
             try
             {
                 indexer.AddToIndex(path);
-                Ewh.WaitOne();
+                Ewh.Ewh.WaitOne();
                 indexer.PatchContent(indexer.GetFromIndex(path)!);
                 done = true;
             }

@@ -25,8 +25,8 @@ builder.Services.AddDbContext<IndexContext>();
 builder.Services.AddSingleton<Indexer>();
 builder.Services.AddSingleton<Blocklist>();
 builder.Services.AddSingleton<SharedStateService>();
-
-
+builder.Services.AddHostedService<ContentWatcher>();
+builder.Services.AddHostedService<LogWatcher>();
 using var host = builder.Build();
 
 var indexer = host.Services.GetRequiredService<Indexer>();
