@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Options;
 using Tomlyn;
 using Serilog;
 
@@ -10,15 +11,12 @@ using AssetsTools.NET.Extra;
 
 // The auto properties are implicitly used by Tomlyn, removing them breaks parsing.
 [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
-public static class Blocklist
+public class Blocklist(IOptions<Settings> options)
 {
-    public static Dictionary<string, HashSet<GameObjectInstance>> Blocks;
-    private static readonly ILogger Logger = Log.ForContext(typeof(Blocklist));
+    private readonly Settings _options = options.Value;
 
-    static Blocklist()
-    {
-        Blocks = BlocklistsParser(GetBlocklists());
-    }
+    public readonly Dictionary<string, HashSet<GameObjectInstance>> Blocks = BlocklistsParser(GetBlocklists());
+    private static readonly ILogger Logger = Log.ForContext(typeof(Blocklist));
 
     public class BlocklistModel
     {
@@ -101,7 +99,7 @@ public static class Blocklist
     }
 
 
-    public static void Patch(string assetPath, GameObjectInstance[] gameObjectsToDisable)
+    public void Patch(string assetPath, GameObjectInstance[] gameObjectsToDisable)
     {
         AssetsManager manager = new();
         var bundleInstance = manager.LoadBundleFile(assetPath);
@@ -139,7 +137,7 @@ public static class Blocklist
                 "Following blocklist objects weren't disabled: {@UnpatchedList}" +
                 "\nThis can mean that these blocklist entries are outdated, consider informing the maintainer",
                 unpatchedObjects);
-        if (Settings.Options.DryRun) return;
+        if (_options.DryRun) return;
         Logger.Information("Done, writing changes as bundle");
         using var writer = new AssetsFileWriter(assetPath + ".clean");
         bundle.Write(writer);
