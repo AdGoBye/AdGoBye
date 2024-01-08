@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using AdGoBye.Plugins;
@@ -61,14 +62,16 @@ public class Indexer
         if (db.Content.Any()) VerifyDbTruth();
         var contentFolders = new DirectoryInfo(GetCacheDir()).GetDirectories();
         if (contentFolders.Length == db.Content.Count() - SafeAllowlistCount()) return;
-        foreach (var newContent in contentFolders.ExceptBy(db.Content.Select(content => content.StableContentName),
-                     info => info.Name))
-        {
-            var (latestVersion, _) = GetLatestFileVersion(newContent);
-            if (latestVersion is null) return;
-            AddToIndex(latestVersion.FullName);
-        }
 
+        Parallel.ForEach(contentFolders.ExceptBy(db.Content.Select(content => content.StableContentName), info => info.Name),
+            newContent =>
+            {
+                var (latestVersion, _) = GetLatestFileVersion(newContent);
+                if (latestVersion is null) return;
+                AddToIndex(latestVersion.FullName);
+            }
+        );
+        
         Logger.Information("Finished Index processing");
         return;
 
@@ -114,6 +117,7 @@ public class Indexer
 
     public static void AddToIndex(string path)
     {
+        Logger.Verbose("Adding path {path}", path);
         using var db = new IndexContext();
         //   - Folder (StableContentName) [singleton, we want this]
         //       - Folder (version) [may exist multiple times] 
