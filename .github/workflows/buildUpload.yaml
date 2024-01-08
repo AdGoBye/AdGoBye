@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - AdGoBye
-      - AdGoBye.*
+      - "AdGoBye/**"
+      - "AdGoBye.Plugins/**"
   pull_request: null
   release:
     types:
