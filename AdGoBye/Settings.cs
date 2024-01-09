@@ -9,6 +9,7 @@ public class SettingsOptions
     public int LogLevel { get; set; }
     public bool EnableLive { get; set; }
     public bool DryRun { get; set; }
+    public string[] BlocklistURLs { get; init; }
 }
 
 public static class Settings
