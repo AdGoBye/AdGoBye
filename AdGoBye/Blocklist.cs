@@ -55,23 +55,53 @@ public static class Blocklist
     {
         var final = new List<BlocklistModel>();
         Directory.CreateDirectory("./Blocklists");
-        var files = Directory.GetFiles("./Blocklists");
-        foreach (var file in files)
+        foreach (var file in Directory.GetFiles("./Blocklists"))
+        {
+            ParseAndAddBlocklist(file,File.ReadAllText(file));
+        }
+        foreach (var blocklist in GetNetworkBlocklists())
+        {
+            ParseAndAddBlocklist(blocklist.Key,blocklist.Value);
+        }
+        
+        return final;
+
+        void ParseAndAddBlocklist(string location, string blocklistContent)
         {
             try
             {
-                var blocklist = Toml.ToModel<BlocklistModel>(File.ReadAllText(file));
+                var blocklist = Toml.ToModel<BlocklistModel>(blocklistContent);
                 Logger.Information("Read blocklist: {Name} ({Maintainer})", blocklist.Title,
                     blocklist.Maintainer);
                 final.Add(blocklist);
             }
             catch (TomlException exception)
             {
-                Logger.Error("Failed to parse blocklist {file}: {error}", file, exception.Message);
+                Logger.Error("Failed to parse blocklist {location}: {error}", location, exception.Message);
             }
         }
+    }
 
-        return final;
+    
+    private static Dictionary<string, string> GetNetworkBlocklists()
+    {
+        Dictionary<string, string> downloadedLists = [];
+        using HttpClient client = new();
+        client.DefaultRequestHeaders.Add("User-Agent", "AdGoBye (https://github.com/AdGoBye/AdGoBye)");
+        foreach (var url in Settings.Options.BlocklistURLs)
+        {
+            var result = client.GetAsync(url);
+            result.Wait();
+            if (!result.Result.IsSuccessStatusCode)
+            {
+                Logger.Error("Blocklist fetch for {url} failed! (Status code: {statusCode})", url, result.Result.StatusCode);
+                continue;
+            }
+            var stringResult = result.Result.Content.ReadAsStringAsync();
+            stringResult.Wait();
+            downloadedLists.Add(url,stringResult.Result);
+        }
+        return downloadedLists;
     }
 
     /// <summary>
