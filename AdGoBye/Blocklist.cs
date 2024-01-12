@@ -59,11 +59,13 @@ public static class Blocklist
         {
             ParseAndAddBlocklist(file,File.ReadAllText(file));
         }
+        
+        if (Settings.Options.BlocklistURLs.Length != 0) return final;
+        
         foreach (var blocklist in GetNetworkBlocklists())
         {
             ParseAndAddBlocklist(blocklist.Key,blocklist.Value);
         }
-        
         return final;
 
         void ParseAndAddBlocklist(string location, string blocklistContent)
