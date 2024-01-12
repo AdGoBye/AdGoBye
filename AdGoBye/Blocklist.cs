@@ -107,10 +107,6 @@ public static class Blocklist
                 blocklistEntries.Add(networkBlocklistElement);
                 Logger.Verbose("Added network blocklist for {url}", optionsUrl);
                 db.SaveChanges();
-                if (!blocklistEntries.Any(databaseEntry => databaseEntry.Url == optionsUrl))
-                {
-                    throw new InvalidOperationException("what the fuck");
-                }
             }
             else
             {
