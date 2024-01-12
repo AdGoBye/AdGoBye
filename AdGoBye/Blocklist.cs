@@ -1,4 +1,7 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
+using System.Net;
 using System.Text.Json.Serialization;
 using Tomlyn;
 using Serilog;
@@ -14,11 +17,6 @@ public static class Blocklist
 {
     public static Dictionary<string, HashSet<GameObjectInstance>> Blocks;
     private static readonly ILogger Logger = Log.ForContext(typeof(Blocklist));
-
-    static Blocklist()
-    {
-        Blocks = BlocklistsParser(GetBlocklists());
-    }
 
     public class BlocklistModel
     {
@@ -49,23 +47,98 @@ public static class Blocklist
         public required double Y { get; init; }
         public required double Z { get; init; }
     }
+    public class NetworkBlocklist
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        // Premature recommendation
+        // ReSharper disable EntityFramework.ModelValidation.UnlimitedStringLength
+        public required string Url { get; set; }
+        public required string Contents { get; set; }
+
+        public string? ETag { get; set; }
+        // ReSharper enable EntityFramework.ModelValidation.UnlimitedStringLength
+    }
+
+    public static void ParseAllBlocklists()
+    {
+        Blocks = BlocklistsParser(GetBlocklists());
+    }
+
+    public static void UpdateNetworkBlocklists()
+    {
+        using var db = new State.IndexContext();
+        var blocklistEntries = db.NetworkBlocklists;
+        List<NetworkBlocklist> existingDatabaseEntries = [];
+        foreach (var optionsBlocklistUrl in Settings.Options.BlocklistUrLs)
+        {
+            existingDatabaseEntries.AddRange(blocklistEntries.Where(savedNetworkBlocklist =>
+                savedNetworkBlocklist.Url == optionsBlocklistUrl));
+        }
+
+        foreach (var danglingBlocklist in blocklistEntries.AsEnumerable().Except(existingDatabaseEntries))
+        {
+            Logger.Verbose("Removing dangling blocklist for {url}", danglingBlocklist.Url);
+            blocklistEntries.Remove(danglingBlocklist);
+        }
+
+        foreach (var optionsUrl in Settings.Options.BlocklistUrLs)
+        {
+            var databaseQuery = blocklistEntries
+                .FirstOrDefault(databaseEntry => databaseEntry.Url == optionsUrl);
+
+            string? ETag = null;
+            if (databaseQuery?.ETag != null) ETag = databaseQuery.ETag;
+            
+            var blocklistDownload = GetBlocklistFromUrl(optionsUrl, ETag);
+            if (blocklistDownload is null) continue;
+
+           
+            if (databaseQuery is null)
+            {
+                var networkBlocklistElement = new NetworkBlocklist
+                {
+                    Url = optionsUrl,
+                    Contents = blocklistDownload.Value.Result,
+                    ETag = blocklistDownload.Value.ETag
+                };
+                blocklistEntries.Add(networkBlocklistElement);
+                Logger.Verbose("Added network blocklist for {url}", optionsUrl);
+                db.SaveChanges();
+                if (!blocklistEntries.Any(databaseEntry => databaseEntry.Url == optionsUrl))
+                {
+                    throw new InvalidOperationException("what the fuck");
+                }
+            }
+            else
+            {
+                databaseQuery.Contents = blocklistDownload.Value.Result;
+                if (blocklistDownload.Value.ETag is not null) databaseQuery.ETag = blocklistDownload.Value.ETag;
+            }
+            db.SaveChanges();
+        }
+    }
 
 
     private static List<BlocklistModel> GetBlocklists()
     {
+        using var db = new State.IndexContext();
         var final = new List<BlocklistModel>();
         Directory.CreateDirectory("./Blocklists");
         foreach (var file in Directory.GetFiles("./Blocklists"))
         {
-            ParseAndAddBlocklist(file,File.ReadAllText(file));
+            ParseAndAddBlocklist(file, File.ReadAllText(file));
         }
-        
-        if (Settings.Options.BlocklistURLs.Length != 0) return final;
-        
-        foreach (var blocklist in GetNetworkBlocklists())
+
+        if (Settings.Options.BlocklistUrLs.Length is 0) return final;
+
+        foreach (var blocklist in db.NetworkBlocklists)
         {
-            ParseAndAddBlocklist(blocklist.Key,blocklist.Value);
+            ParseAndAddBlocklist(blocklist.Url, blocklist.Contents);
         }
+
         return final;
 
         void ParseAndAddBlocklist(string location, string blocklistContent)
@@ -84,26 +157,34 @@ public static class Blocklist
         }
     }
 
-    
-    private static Dictionary<string, string> GetNetworkBlocklists()
+
+    // ReSharper disable once InconsistentNaming
+    private static (string Result, string? ETag)? GetBlocklistFromUrl(string url, string? ETag)
     {
-        Dictionary<string, string> downloadedLists = [];
         using HttpClient client = new();
         client.DefaultRequestHeaders.Add("User-Agent", "AdGoBye (https://github.com/AdGoBye/AdGoBye)");
-        foreach (var url in Settings.Options.BlocklistURLs)
+        if (ETag is not null) client.DefaultRequestHeaders.Add("If-None-Match", ETag);
+        var result = client.GetAsync(url);
+        result.Wait();
+
+        if (result.Result.StatusCode is HttpStatusCode.NotModified)
         {
-            var result = client.GetAsync(url);
-            result.Wait();
-            if (!result.Result.IsSuccessStatusCode)
-            {
-                Logger.Error("Blocklist fetch for {url} failed! (Status code: {statusCode})", url, result.Result.StatusCode);
-                continue;
-            }
-            var stringResult = result.Result.Content.ReadAsStringAsync();
-            stringResult.Wait();
-            downloadedLists.Add(url,stringResult.Result);
+            Logger.Debug("{url} told us the resource has not been modified", url);
+            return null;
         }
-        return downloadedLists;
+
+        if (!result.Result.IsSuccessStatusCode)
+        {
+            Logger.Error("Blocklist fetch for {url} failed! (Status code: {statusCode})", url,
+                result.Result.StatusCode);
+            return null;
+        }
+
+        var stringResult = result.Result.Content.ReadAsStringAsync();
+        stringResult.Wait();
+        return result.Result.Headers.ETag is not null
+            ? (stringResult.Result, result.Result.Headers.ETag.Tag)
+            : (stringResult.Result, null);
     }
 
     /// <summary>

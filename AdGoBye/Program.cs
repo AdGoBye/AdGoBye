@@ -21,6 +21,8 @@ var logger = Log.ForContext(typeof(Program));
 
 await using var db = new State.IndexContext();
 db.Database.Migrate();
+Blocklist.UpdateNetworkBlocklists();
+Blocklist.ParseAllBlocklists();
 Indexer.ManageIndex();
 
 PluginLoader.LoadPlugins();
