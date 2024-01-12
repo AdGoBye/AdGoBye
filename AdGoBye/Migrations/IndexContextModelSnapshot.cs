@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace AdGoBye.Migrations
 {
-    [DbContext(typeof(IndexContext))]
+    [DbContext(typeof(State.IndexContext))]
     partial class IndexContextModelSnapshot : ModelSnapshot
     {
         protected override void BuildModel(ModelBuilder modelBuilder)

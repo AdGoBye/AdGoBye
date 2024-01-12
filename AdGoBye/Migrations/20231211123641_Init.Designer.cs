@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace AdGoBye.Migrations
 {
-    [DbContext(typeof(IndexContext))]
+    [DbContext(typeof(State.IndexContext))]
     [Migration("20231211123641_Init")]
     partial class Init
     {

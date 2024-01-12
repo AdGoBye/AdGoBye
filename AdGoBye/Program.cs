@@ -19,7 +19,7 @@ Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
     .CreateLogger();
 var logger = Log.ForContext(typeof(Program));
 
-await using var db = new IndexContext();
+await using var db = new State.IndexContext();
 db.Database.Migrate();
 Indexer.ManageIndex();
 
