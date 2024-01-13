@@ -1,4 +1,8 @@
-﻿namespace AdGoBye.Plugins;
+﻿// Code is used externally
+// ReSharper disable UnusedParameter.Global
+// ReSharper disable UnusedMethodReturnValue.Global
+
+namespace AdGoBye.Plugins;
 
 public interface IPlugin
 {
