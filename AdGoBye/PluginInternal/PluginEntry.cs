@@ -2,18 +2,10 @@
 
 namespace AdGoBye.PluginInternal;
 
-public class PluginEntry
+public class PluginEntry(string name, string maintainer, string version, IPlugin instance)
 {
-    public string Name;
-    public string Maintainer;
-    public string Version;
-    public IPlugin Instance;
-
-    public PluginEntry(string name, string maintainer, string version, IPlugin instance)
-    {
-        Name = name;
-        Maintainer = maintainer;
-        Version = version;
-        Instance = instance;
-    }
+    public IPlugin Instance = instance;
+    public string Maintainer = maintainer;
+    public string Name = name;
+    public string Version = version;
 }
