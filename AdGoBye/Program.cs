@@ -18,6 +18,7 @@ Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
         theme: TemplateTheme.Literate))
     .CreateLogger();
 var logger = Log.ForContext(typeof(Program));
+SingleInstance.Attach(); 
 
 await using var db = new IndexContext();
 db.Database.Migrate();
