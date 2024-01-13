@@ -8,7 +8,7 @@ namespace AdGoBye;
 public static class PluginLoader
 {
     private static readonly ILogger Logger = Log.ForContext(typeof(PluginLoader));
-    public static List<PluginEntry> LoadedPlugins = [];
+    public static readonly List<PluginEntry> LoadedPlugins = [];
 
     public static void LoadPlugins()
     {
@@ -20,13 +20,14 @@ public static class PluginLoader
         {
             LoadPlugin(Path.GetFullPath(pluginPath));
         }
+
         return;
 
         static string GetRelativeDirectoryPath(string endingDirectory)
         {
             var relPath = $".{Path.DirectorySeparatorChar}{endingDirectory}";
             if (string.IsNullOrEmpty(Environment.ProcessPath)) return relPath;
-            
+
             var processPath = Environment.ProcessPath;
             var lastDirIndex = processPath.LastIndexOf(Path.DirectorySeparatorChar);
             var lastDir = processPath[..lastDirIndex];
@@ -36,7 +37,7 @@ public static class PluginLoader
         }
     }
 
-    internal static void LoadPlugin(string pluginPath)
+    private static void LoadPlugin(string pluginPath)
     {
         Assembly? plugin;
 
