@@ -1,12 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
-using Tomlyn;
-using Serilog;
-
-namespace AdGoBye;
-
 using AssetsTools.NET;
 using AssetsTools.NET.Extra;
+using Serilog;
+using Tomlyn;
+
+namespace AdGoBye;
 
 // The auto properties are implicitly used by Tomlyn, removing them breaks parsing.
 [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
@@ -18,36 +17,6 @@ public static class Blocklist
     static Blocklist()
     {
         Blocks = BlocklistsParser(GetBlocklists());
-    }
-
-    public class BlocklistModel
-    {
-        public string? Title { get; init; }
-        public string? Description { get; init; }
-        public string? Maintainer { get; init; }
-        [JsonPropertyName("block")] public List<BlockEntry>? Blocks { get; init; }
-    }
-
-    public class BlockEntry
-    {
-        public string? FriendlyName { get; init; }
-        public string? WorldId { get; init; }
-        public List<GameObjectInstance>? GameObjects { get; init; }
-    }
-
-
-    public class GameObjectInstance
-    {
-        public required string Name { get; init; }
-        public GameObjectPosition? Position { get; init; }
-        public GameObjectInstance? Parent { get; init; }
-    }
-
-    public class GameObjectPosition
-    {
-        public required double X { get; init; }
-        public required double Y { get; init; }
-        public required double Z { get; init; }
     }
 
 
@@ -196,6 +165,7 @@ public static class Blocklist
         bool DoesPositionMatch(GameObjectPosition reference, AssetTypeValueField m_LocalPosition)
         {
             // m_LocalPosition's origin is float but TOML Parser dies when reference type is float so we need to cast it here
+            // ReSharper disable CompareOfFloatsByEqualityOperator - Reading from disk, should be fine
             switch (m_LocalPosition.FieldName)
             {
                 case "x":
@@ -208,8 +178,39 @@ public static class Blocklist
                     if ((float)reference.Z != m_LocalPosition.AsFloat) return false;
                     break;
             }
+            // ReSharper restore CompareOfFloatsByEqualityOperator
 
             return true;
         }
+    }
+
+    public class BlocklistModel
+    {
+        public string? Title { get; init; }
+        public string? Description { get; init; }
+        public string? Maintainer { get; init; }
+        [JsonPropertyName("block")] public List<BlockEntry>? Blocks { get; init; }
+    }
+
+    public class BlockEntry
+    {
+        public string? FriendlyName { get; init; }
+        public string? WorldId { get; init; }
+        public List<GameObjectInstance>? GameObjects { get; init; }
+    }
+
+
+    public class GameObjectInstance
+    {
+        public required string Name { get; init; }
+        public GameObjectPosition? Position { get; init; }
+        public GameObjectInstance? Parent { get; init; }
+    }
+
+    public class GameObjectPosition
+    {
+        public required double X { get; init; }
+        public required double Y { get; init; }
+        public required double Z { get; init; }
     }
 }
