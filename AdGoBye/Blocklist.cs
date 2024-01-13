@@ -74,7 +74,7 @@ public static class Blocklist
         foreach (var danglingBlocklist in blocklistEntries.Where(blocklist =>
                      Settings.Options.BlocklistUrLs.All(url => url != blocklist.Url)))
         {
-            Logger.Verbose("Removing dangling blocklist for {url}", danglingBlocklist.Url);
+            Logger.Information("Removing dangling blocklist for {url}", danglingBlocklist.Url);
             blocklistEntries.RemoveRange(danglingBlocklist);
         }
 
@@ -100,7 +100,7 @@ public static class Blocklist
                     ETag = blocklistDownload.Value.ETag
                 };
                 blocklistEntries.Add(networkBlocklistElement);
-                Logger.Verbose("Added network blocklist for {url}", optionsUrl);
+                Logger.Information("Added network blocklist for {url}", optionsUrl);
             }
             else
             {
@@ -160,7 +160,7 @@ public static class Blocklist
 
         if (result.Result.StatusCode is HttpStatusCode.NotModified)
         {
-            Logger.Debug("{url} told us the resource has not been modified", url);
+            Logger.Verbose("{url} told us the resource has not been modified", url);
             return null;
         }
 
