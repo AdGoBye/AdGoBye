@@ -210,13 +210,13 @@ public class Indexer
             return false;
         }
 
-        static bool IsWorldHigherUnityVersion(Content IndexedContent, Content newContent)
+        static bool IsWorldHigherUnityVersion(Content indexedContent, Content newContent)
         {
             // Hack: [Regalia 2023-12-25T03:33:18Z] I'm not paid enough to parse Unity version strings reliably
             // This assumes the Unity versions always contains the major version at the start, is seperated by a dot and 
             // the major versions will always be greater to each other. Upcoming Unity 6 will violate this assumption
             // but I'm betting that service provider won't upgrade anytime soon
-            var indexedContentVersion = ResolveUnityVersion(IndexedContent.VersionMeta.Path).Split(".")[0];
+            var indexedContentVersion = ResolveUnityVersion(indexedContent.VersionMeta.Path).Split(".")[0];
             var newContentVersion = ResolveUnityVersion(newContent.VersionMeta.Path).Split(".")[0];
             return int.Parse(newContentVersion) > int.Parse(indexedContentVersion);
         }
