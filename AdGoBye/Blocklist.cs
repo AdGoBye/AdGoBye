@@ -71,18 +71,14 @@ public static class Blocklist
     {
         using var db = new State.IndexContext();
         var blocklistEntries = db.NetworkBlocklists;
-        List<NetworkBlocklist> existingDatabaseEntries = [];
-        foreach (var optionsBlocklistUrl in Settings.Options.BlocklistUrLs)
-        {
-            existingDatabaseEntries.AddRange(blocklistEntries.Where(savedNetworkBlocklist =>
-                savedNetworkBlocklist.Url == optionsBlocklistUrl));
-        }
-
-        foreach (var danglingBlocklist in blocklistEntries.AsEnumerable().Except(existingDatabaseEntries))
+        foreach (var danglingBlocklist in blocklistEntries.Where(blocklist =>
+                     Settings.Options.BlocklistUrLs.All(url => url != blocklist.Url)))
         {
             Logger.Verbose("Removing dangling blocklist for {url}", danglingBlocklist.Url);
-            blocklistEntries.Remove(danglingBlocklist);
+            blocklistEntries.RemoveRange(danglingBlocklist);
         }
+
+        db.SaveChanges();
 
         foreach (var optionsUrl in Settings.Options.BlocklistUrLs)
         {
@@ -91,11 +87,10 @@ public static class Blocklist
 
             string? ETag = null;
             if (databaseQuery?.ETag != null) ETag = databaseQuery.ETag;
-            
+
             var blocklistDownload = GetBlocklistFromUrl(optionsUrl, ETag);
             if (blocklistDownload is null) continue;
 
-           
             if (databaseQuery is null)
             {
                 var networkBlocklistElement = new NetworkBlocklist
@@ -106,13 +101,13 @@ public static class Blocklist
                 };
                 blocklistEntries.Add(networkBlocklistElement);
                 Logger.Verbose("Added network blocklist for {url}", optionsUrl);
-                db.SaveChanges();
             }
             else
             {
                 databaseQuery.Contents = blocklistDownload.Value.Result;
                 if (blocklistDownload.Value.ETag is not null) databaseQuery.ETag = blocklistDownload.Value.ETag;
             }
+
             db.SaveChanges();
         }
     }
