@@ -1,14 +1,14 @@
 ﻿using AdGoBye.Plugins;
+using AssetsTools.NET;
+using AssetsTools.NET.Extra;
 using Serilog;
 
 namespace AdGoBye.ExamplePlugin;
 
-using AssetsTools.NET;
-using AssetsTools.NET.Extra;
-
 public class ExamplePlugin : BasePlugin
 {
     private static readonly ILogger Logger = Log.ForContext(typeof(ExamplePlugin));
+
     public override EPluginType PluginType()
     {
         return EPluginType.Global;
@@ -23,7 +23,7 @@ public class ExamplePlugin : BasePlugin
             var bundleInstance = manager.LoadBundleFile(dataLocation);
             var bundle = bundleInstance.file;
 
-            var assetFileInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 1, false);
+            var assetFileInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 1);
             var assetsFile = assetFileInstance.file;
 
             var foundOneChair = false;
@@ -31,13 +31,14 @@ public class ExamplePlugin : BasePlugin
             {
                 var monoBehaviourInfo = manager.GetBaseField(assetFileInstance, monoBehaviour);
                 if (monoBehaviourInfo["PlayerMobility"].IsDummy) continue;
-                
+
                 var parentGameObject = assetsFile.GetAssetInfo(monoBehaviourInfo["m_GameObject.m_PathID"].AsLong);
                 var parentGameObjectInfo = manager.GetBaseField(assetFileInstance, parentGameObject);
-                
+
                 if (parentGameObjectInfo["m_IsActive"].AsBool is false) continue;
-                Logger.Verbose("Found chair on '{name}' [{PathID}], disabling", parentGameObjectInfo["m_Name"].AsString, parentGameObject.PathId);
-                
+                Logger.Verbose("Found chair on '{name}' [{PathID}], disabling", parentGameObjectInfo["m_Name"].AsString,
+                    parentGameObject.PathId);
+
                 parentGameObjectInfo["m_IsActive"].AsBool = false;
                 parentGameObject.SetNewData(parentGameObjectInfo);
 
@@ -50,12 +51,12 @@ public class ExamplePlugin : BasePlugin
                 Logger.Verbose("Skipping, no chairs found");
                 return EPatchResult.Skipped;
             }
-            
+
             Logger.Verbose("Writing changes to bundle");
             bundle.BlockAndDirInfo.DirectoryInfos[1].SetNewData(assetsFile);
             using var writer = new AssetsFileWriter(dataLocation + ".mod");
             bundle.Write(writer);
-            
+
             writer.Close();
             assetsFile.Close();
             bundle.Close();
@@ -66,7 +67,7 @@ public class ExamplePlugin : BasePlugin
             return EPatchResult.Fail;
         }
 
-        File.Replace(dataLocation + ".mod",dataLocation, null);
+        File.Replace(dataLocation + ".mod", dataLocation, null);
         return EPatchResult.Success;
     }
 }

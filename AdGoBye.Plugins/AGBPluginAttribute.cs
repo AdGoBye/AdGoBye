@@ -2,10 +2,10 @@
 
 public class AgbPluginAttribute : Attribute
 {
-    public string Name;
-    public string Maintainer;
-    public string Version;
     public Type Instance;
+    public string Maintainer;
+    public string Name;
+    public string Version;
 
     public AgbPluginAttribute(string name, string maintainer, string version, Type instance)
     {
