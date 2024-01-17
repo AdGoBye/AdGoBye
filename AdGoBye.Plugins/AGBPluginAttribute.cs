@@ -1,17 +1,13 @@
-﻿namespace AdGoBye.Plugins;
+﻿// Code is used externally
+// ReSharper disable UnusedMember.Global
 
-public class AgbPluginAttribute : Attribute
+namespace AdGoBye.Plugins;
+
+public class AgbPluginAttribute(string name, string maintainer, string version, Type instance)
+    : Attribute
 {
-    public string Name;
-    public string Maintainer;
-    public string Version;
-    public Type Instance;
-
-    public AgbPluginAttribute(string name, string maintainer, string version, Type instance)
-    {
-        Name = name;
-        Maintainer = maintainer;
-        Version = version;
-        Instance = instance;
-    }
+    public Type Instance = instance;
+    public string Maintainer = maintainer;
+    public string Name = name;
+    public string Version = version;
 }

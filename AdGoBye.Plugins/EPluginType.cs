@@ -3,5 +3,5 @@
 public enum EPluginType : byte
 {
     Global = 0,
-    ContentSpecific = 1,
+    ContentSpecific = 1
 }
