@@ -20,8 +20,10 @@ Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
 var logger = Log.ForContext(typeof(Program));
 SingleInstance.Attach(); 
 
-await using var db = new IndexContext();
+await using var db = new State.IndexContext();
 db.Database.Migrate();
+Blocklist.UpdateNetworkBlocklists();
+Blocklist.ParseAllBlocklists();
 Indexer.ManageIndex();
 
 PluginLoader.LoadPlugins();

@@ -1,4 +1,7 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
+using System.Net;
 using System.Text.Json.Serialization;
 using AssetsTools.NET;
 using AssetsTools.NET.Extra;
@@ -22,25 +25,67 @@ public static class Blocklist
 
     private static List<BlocklistModel> GetBlocklists()
     {
+        using var db = new State.IndexContext();
         var final = new List<BlocklistModel>();
         Directory.CreateDirectory("./Blocklists");
-        var files = Directory.GetFiles("./Blocklists");
-        foreach (var file in files)
+        foreach (var file in Directory.GetFiles("./Blocklists"))
+        {
+            ParseAndAddBlocklist(file, File.ReadAllText(file));
+        }
+
+        if (Settings.Options.BlocklistUrLs.Length is 0) return final;
+
+        foreach (var blocklist in db.NetworkBlocklists)
+        {
+            ParseAndAddBlocklist(blocklist.Url, blocklist.Contents);
+        }
+
+        return final;
+
+        void ParseAndAddBlocklist(string location, string blocklistContent)
         {
             try
             {
-                var blocklist = Toml.ToModel<BlocklistModel>(File.ReadAllText(file));
+                var blocklist = Toml.ToModel<BlocklistModel>(blocklistContent);
                 Logger.Information("Read blocklist: {Name} ({Maintainer})", blocklist.Title,
                     blocklist.Maintainer);
                 final.Add(blocklist);
             }
             catch (TomlException exception)
             {
-                Logger.Error("Failed to parse blocklist {file}: {error}", file, exception.Message);
+                Logger.Error("Failed to parse blocklist {location}: {error}", location, exception.Message);
             }
         }
+    }
 
-        return final;
+
+    // ReSharper disable once InconsistentNaming
+    private static (string Result, string? ETag)? GetBlocklistFromUrl(string url, string? ETag)
+    {
+        using HttpClient client = new();
+        client.DefaultRequestHeaders.Add("User-Agent", "AdGoBye (https://github.com/AdGoBye/AdGoBye)");
+        if (ETag is not null) client.DefaultRequestHeaders.Add("If-None-Match", ETag);
+        var result = client.GetAsync(url);
+        result.Wait();
+
+        if (result.Result.StatusCode is HttpStatusCode.NotModified)
+        {
+            Logger.Verbose("{url} told us the resource has not been modified", url);
+            return null;
+        }
+
+        if (!result.Result.IsSuccessStatusCode)
+        {
+            Logger.Error("Blocklist fetch for {url} failed! (Status code: {statusCode})", url,
+                result.Result.StatusCode);
+            return null;
+        }
+
+        var stringResult = result.Result.Content.ReadAsStringAsync();
+        stringResult.Wait();
+        return result.Result.Headers.ETag is not null
+            ? (stringResult.Result, result.Result.Headers.ETag.Tag)
+            : (stringResult.Result, null);
     }
 
     /// <summary>
