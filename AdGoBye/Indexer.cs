@@ -7,7 +7,6 @@ using AssetsTools.NET.Extra;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Win32;
 using Serilog;
-using DbContext = Microsoft.EntityFrameworkCore.DbContext;
 
 namespace AdGoBye;
 
@@ -37,18 +36,7 @@ public record Content
     }
 }
 
-public sealed class IndexContext : DbContext
-{
-    protected override void OnConfiguring(DbContextOptionsBuilder options)
-    {
-        options.UseSqlite("Data Source=database.db");
-    }
 
-#pragma warning disable CS8618 //
-    public DbSet<Content> Content { get; set; }
-    public DbSet<Content.ContentVersionMeta> ContentVersionMetas { get; set; }
-#pragma warning restore CS8618
-}
 
 public class Indexer
 {
@@ -57,7 +45,7 @@ public class Indexer
 
     public static void ManageIndex()
     {
-        using var db = new IndexContext();
+        using var db = new State.IndexContext();
         if (db.Content.Any()) VerifyDbTruth();
         var contentFolders = new DirectoryInfo(GetCacheDir()).GetDirectories();
         if (contentFolders.Length == db.Content.Count() - SafeAllowlistCount()) return;
@@ -80,7 +68,7 @@ public class Indexer
 
     private static void VerifyDbTruth()
     {
-        using var db = new IndexContext();
+        using var db = new State.IndexContext();
         foreach (var content in db.Content.Include(content => content.VersionMeta))
         {
             var directoryMeta = new DirectoryInfo(content.VersionMeta.Path);
@@ -114,7 +102,7 @@ public class Indexer
 
     public static void AddToIndex(string path)
     {
-        using var db = new IndexContext();
+        using var db = new State.IndexContext();
         //   - Folder (StableContentName) [singleton, we want this]
         //       - Folder (version) [may exist multiple times] 
         //          - __info
@@ -242,7 +230,7 @@ public class Indexer
 
     public static Content? GetFromIndex(string path)
     {
-        using var db = new IndexContext();
+        using var db = new State.IndexContext();
         var directory = new DirectoryInfo(path);
         return db.Content.Include(content => content.VersionMeta)
             .FirstOrDefault(content => content.StableContentName == directory.Parent!.Parent!.Name);
@@ -250,7 +238,7 @@ public class Indexer
 
     public static void RemoveFromIndex(string path)
     {
-        using var db = new IndexContext();
+        using var db = new State.IndexContext();
         var indexMatch = GetFromIndex(path);
         if (indexMatch is null) return;
 

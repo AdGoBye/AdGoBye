@@ -8,13 +8,35 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace AdGoBye.Migrations
 {
-    [DbContext(typeof(IndexContext))]
+    [DbContext(typeof(State.IndexContext))]
     partial class IndexContextModelSnapshot : ModelSnapshot
     {
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.0");
+
+            modelBuilder.Entity("AdGoBye.Blocklist+NetworkBlocklist", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Contents")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ETag")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("NetworkBlocklists");
+                });
 
             modelBuilder.Entity("AdGoBye.Content", b =>
                 {
