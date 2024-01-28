@@ -1,5 +1,5 @@
-using System.Diagnostics.CodeAnalysis;
 using Serilog;
+using System.Diagnostics.CodeAnalysis;
 
 // ReSharper disable FunctionNeverReturns
 
@@ -64,7 +64,7 @@ public static class Live
                 var newContent = Indexer.GetFromIndex(path);
                 if (newContent is not null) Indexer.PatchContent(newContent);
                 done = true;
-            }   
+            }
             catch (EndOfStreamException)
             {
                 await Task.Delay(500);
@@ -78,7 +78,7 @@ public static class Live
     {
         CancellationTokenSource ct = new();
         var currentTask = Task.Run(() => HandleFileLock(GetNewestLog(), ct.Token));
-        
+
         using var watcher = new FileSystemWatcher(path);
         watcher.NotifyFilter = NotifyFilters.FileName;
         watcher.Created += (_, e) =>
@@ -90,7 +90,7 @@ public static class Live
             // Assuming a new log file means a client restart, it's likely not loading any file.
             // Let's take initiative and free any tasks.
             Ewh.Set();
-            
+
             currentTask = Task.Run(() => HandleFileLock(e.FullPath, ct.Token));
             Logger.Verbose("Rotated log parsing to {file}", e.Name);
         };

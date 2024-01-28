@@ -1,7 +1,7 @@
-﻿using System.Reflection;
-using AdGoBye.PluginInternal;
+﻿using AdGoBye.PluginInternal;
 using AdGoBye.Plugins;
 using Serilog;
+using System.Reflection;
 
 namespace AdGoBye;
 
