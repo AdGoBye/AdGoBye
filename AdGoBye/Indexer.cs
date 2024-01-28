@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
@@ -49,12 +50,15 @@ public class Indexer
         if (db.Content.Any()) VerifyDbTruth();
         var contentFolders = new DirectoryInfo(GetCacheDir()).GetDirectories();
         if (contentFolders.Length == db.Content.Count() - SafeAllowlistCount()) return;
-        foreach (var newContent in contentFolders.ExceptBy(db.Content.Select(content => content.StableContentName),
-                     info => info.Name))
+
+        var content = contentFolders
+            .ExceptBy(db.Content.Select(content => content.StableContentName), info => info.Name)
+            .Select(newContent => GetLatestFileVersion(newContent).HighestVersionDirectory)
+            .Where(directory => directory != null);
+
+        if (content != null)
         {
-            var (latestVersion, _) = GetLatestFileVersion(newContent);
-            if (latestVersion is null) return;
-            AddToIndex(latestVersion.FullName);
+            AddToIndex(content);
         }
 
         Logger.Information("Finished Index processing");
@@ -102,6 +106,36 @@ public class Indexer
 
     public static void AddToIndex(string path)
     {
+        if (AddToIndexPart1(path, out var content) && content != null)
+        {
+            AddToIndexPart2(content);
+        }
+    }
+
+    public static void AddToIndex(IEnumerable<DirectoryInfo?> paths)
+    {
+        ConcurrentBag<Content> contents = [];
+        Parallel.ForEach(paths, path =>
+        {
+            if (path != null && AddToIndexPart1(path.FullName, out var content) && content != null)
+            {
+                contents.Add(content);
+            }
+        });
+
+        var groupedById = contents.GroupBy(content => content.Id);
+
+        Parallel.ForEach(groupedById, group =>
+        {
+            foreach (var content in group)
+            {
+                AddToIndexPart2(content);
+            }
+        });
+    }
+
+    public static bool AddToIndexPart1(string path, out Content? content)
+    {
         using var db = new State.IndexContext();
         //   - Folder (StableContentName) [singleton, we want this]
         //       - Folder (version) [may exist multiple times] 
@@ -112,7 +146,7 @@ public class Indexer
         if (directory.Name == "__data") directory = directory.Parent;
 
         // If we already have an item in Index that has the same StableContentName, then this is a newer version of something Indexed
-        var content = db.Content.Include(content => content.VersionMeta)
+        content = db.Content.Include(content => content.VersionMeta)
             .FirstOrDefault(content => content.StableContentName == directory!.Parent!.Name);
         if (content is not null)
         {
@@ -122,7 +156,7 @@ public class Indexer
                 Logger.Verbose(
                     "Skipped Indexation of {directory} since it isn't an upgrade (Index: {greaterVersion}, Parsed: {lesserVersion})",
                     directory.FullName, content.VersionMeta.Version, version);
-                return;
+                return false;
             }
 
             content.VersionMeta.Version = version;
@@ -130,12 +164,17 @@ public class Indexer
             content.VersionMeta.PatchedBy = [];
 
             db.SaveChanges();
-            return;
+            return false;
         }
 
-        if (!File.Exists(directory!.FullName + "/__data")) return;
+        if (!File.Exists(directory!.FullName + "/__data")) return false;
         content = FileToContent(directory);
-        if (content is null) return;
+        return true;
+    }
+
+    private static void AddToIndexPart2(Content content)
+    {
+        using var db = new State.IndexContext();
         var indexCopy = db.Content.Include(existingFile => existingFile.VersionMeta)
             .FirstOrDefault(existingFile => existingFile.Id == content.Id);
 
@@ -300,7 +339,7 @@ public class Indexer
         }
     }
 
-    private static Tuple<DirectoryInfo?, int> GetLatestFileVersion(DirectoryInfo stableNameFolder)
+    private static (DirectoryInfo? HighestVersionDirectory, int HighestVersion) GetLatestFileVersion(DirectoryInfo stableNameFolder)
     {
         var highestVersion = 0;
         DirectoryInfo? highestVersionDir = null;
@@ -312,7 +351,7 @@ public class Indexer
             highestVersionDir = directory;
         }
 
-        return new Tuple<DirectoryInfo?, int>(highestVersionDir, highestVersion);
+        return (highestVersionDir, highestVersion);
     }
 
     private static Content? FileToContent(DirectoryInfo pathToFile)
