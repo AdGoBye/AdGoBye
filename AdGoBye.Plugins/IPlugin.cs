@@ -30,7 +30,7 @@
         /// <param name="dataDirectoryPath">The path of the cache directory that contains the __data file</param>
         /// <returns>A <see cref="EPatchResult"/> that signifies the result of the plugin's patch operation</returns>
         EPatchResult Patch(string contentId, string dataDirectoryPath);
-        
+
         /// <param name="contentId">A string representing the content's blueprint identifier</param>
         /// <param name="dataDirectoryPath">The path of the cache directory that contains the __data file</param>
         /// <returns>A <see cref="EVerifyResult"/> that signifies the result of the plugin's patch operation</returns>

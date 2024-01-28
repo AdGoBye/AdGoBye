@@ -1,7 +1,7 @@
+using Serilog;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using Tomlyn;
-using Serilog;
 
 namespace AdGoBye;
 
@@ -130,7 +130,7 @@ public static class Blocklist
                 bundle.BlockAndDirInfo.DirectoryInfos[1].SetNewData(assetFile);
             }
         }
-        
+
         if (Settings.Options.DryRun) return;
         Logger.Information("Done, writing changes as bundle");
         using var writer = new AssetsFileWriter(assetPath + ".clean");

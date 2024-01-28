@@ -1,13 +1,13 @@
-using System.Collections.Concurrent;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.InteropServices;
 using AdGoBye.Plugins;
 using AssetsTools.NET.Extra;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Win32;
 using Serilog;
+using System.Collections.Concurrent;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using DbContext = Microsoft.EntityFrameworkCore.DbContext;
 
 namespace AdGoBye;
@@ -68,7 +68,7 @@ public class Indexer
             .Select(newContent => GetLatestFileVersion(newContent).HighestVersionDirectory)
             .Where(directory => directory != null);
 
-        if(content != null)
+        if (content != null)
         {
             AddToIndex(content);
         }
@@ -134,7 +134,7 @@ public class Indexer
         ConcurrentBag<Content> contents = [];
         Parallel.ForEach(paths, path =>
         {
-            if(path != null && AddToIndexPart1(path.FullName, out var content) && content != null)
+            if (path != null && AddToIndexPart1(path.FullName, out var content) && content != null)
             {
                 contents.Add(content);
             }

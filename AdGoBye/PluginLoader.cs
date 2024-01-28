@@ -1,7 +1,7 @@
-﻿using System.Reflection;
-using AdGoBye.PluginInternal;
+﻿using AdGoBye.PluginInternal;
 using AdGoBye.Plugins;
 using Serilog;
+using System.Reflection;
 
 namespace AdGoBye;
 
@@ -26,7 +26,7 @@ public static class PluginLoader
         {
             var relPath = $".{Path.DirectorySeparatorChar}{endingDirectory}";
             if (string.IsNullOrEmpty(Environment.ProcessPath)) return relPath;
-            
+
             var processPath = Environment.ProcessPath;
             var lastDirIndex = processPath.LastIndexOf(Path.DirectorySeparatorChar);
             var lastDir = processPath[..lastDirIndex];
