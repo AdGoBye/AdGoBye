@@ -70,7 +70,7 @@ public class Indexer
 
         if(content != null)
         {
-            AddManyToIndex(content);
+            AddToIndex(content);
         }
 
         Logger.Information("Finished Index processing");
@@ -121,15 +121,15 @@ public class Indexer
     //          - __info
     //          - __data 
     //          - __lock (if currently used)
-    public static void AddSingleToIndex(string path)
+    public static void AddToIndex(string path)
     {
-        if (!AddToIndexPart1(path, out var content) && content != null)
+        if (AddToIndexPart1(path, out var content) && content != null)
         {
             AddToIndexPart2(content);
         }
     }
 
-    public static void AddManyToIndex(IEnumerable<DirectoryInfo?> paths)
+    public static void AddToIndex(IEnumerable<DirectoryInfo?> paths)
     {
         ConcurrentBag<Content> contents = new();
         Parallel.ForEach(paths, path =>

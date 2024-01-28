@@ -59,7 +59,7 @@ public static class Live
         {
             try
             {
-                Indexer.AddSingleToIndex(path);
+                Indexer.AddToIndex(path);
                 Ewh.WaitOne();
                 Indexer.PatchContent(Indexer.GetFromIndex(path)!);
                 done = true;
