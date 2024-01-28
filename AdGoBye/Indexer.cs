@@ -131,7 +131,7 @@ public class Indexer
 
     public static void AddToIndex(IEnumerable<DirectoryInfo?> paths)
     {
-        ConcurrentBag<Content> contents = new();
+        ConcurrentBag<Content> contents = [];
         Parallel.ForEach(paths, path =>
         {
             if(path != null && AddToIndexPart1(path.FullName, out var content) && content != null)
@@ -141,12 +141,8 @@ public class Indexer
         });
 
         var groupedById = contents.GroupBy(content => content.Id);
-        var organizedGroup = groupedById.Where(group => group.Count() > 1)
-            .Select(x => x.Select(y => y))
-            .Append(groupedById.Where(group => group.Count() == 1).Select(group => group.First()).ToList())
-            .ToList();
 
-        Parallel.ForEach(organizedGroup, group =>
+        Parallel.ForEach(groupedById, group =>
         {
             foreach (var content in group)
             {
