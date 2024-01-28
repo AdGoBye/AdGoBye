@@ -1,6 +1,6 @@
+using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using AdGoBye.Plugins;
@@ -63,15 +63,16 @@ public class Indexer
         var contentFolders = new DirectoryInfo(GetCacheDir()).GetDirectories();
         if (contentFolders.Length == db.Content.Count() - SafeAllowlistCount()) return;
 
-        Parallel.ForEach(contentFolders.ExceptBy(db.Content.Select(content => content.StableContentName), info => info.Name),
-            newContent =>
-            {
-                var (latestVersion, _) = GetLatestFileVersion(newContent);
-                if (latestVersion is null) return;
-                AddToIndex(latestVersion.FullName);
-            }
-        );
-        
+        var content = contentFolders
+            .ExceptBy(db.Content.Select(content => content.StableContentName), info => info.Name)
+            .Select(newContent => GetLatestFileVersion(newContent).HighestVersionDirectory)
+            .Where(directory => directory != null);
+
+        if(content != null)
+        {
+            AddManyToIndex(content);
+        }
+
         Logger.Information("Finished Index processing");
         return;
 
@@ -115,21 +116,55 @@ public class Indexer
         db.SaveChanges();
     }
 
-    public static void AddToIndex(string path)
+    //   - Folder (StableContentName) [singleton, we want this]
+    //       - Folder (version) [may exist multiple times] 
+    //          - __info
+    //          - __data 
+    //          - __lock (if currently used)
+    public static void AddSingleToIndex(string path)
     {
-        Logger.Verbose("Adding path {path}", path);
+        if (!AddToIndexPart1(path, out var content) && content != null)
+        {
+            AddToIndexPart2(content);
+        }
+    }
+
+    public static void AddManyToIndex(IEnumerable<DirectoryInfo?> paths)
+    {
+        ConcurrentBag<Content> contents = new();
+        Parallel.ForEach(paths, path =>
+        {
+            if(path != null && AddToIndexPart1(path.FullName, out var content) && content != null)
+            {
+                contents.Add(content);
+            }
+        });
+
+        var groupedById = contents.GroupBy(content => content.Id);
+        var organizedGroup = groupedById.Where(group => group.Count() > 1)
+            .Select(x => x.Select(y => y))
+            .Append(groupedById.Where(group => group.Count() == 1).Select(group => group.First()).ToList())
+            .ToList();
+
+        Parallel.ForEach(organizedGroup, group =>
+        {
+            foreach (var content in group)
+            {
+                AddToIndexPart2(content);
+            }
+        });
+    }
+
+    private static bool AddToIndexPart1(string path, out Content? content)
+    {
         using var db = new IndexContext();
-        //   - Folder (StableContentName) [singleton, we want this]
-        //       - Folder (version) [may exist multiple times] 
-        //          - __info
-        //          - __data 
-        //          - __lock (if currently used)
         var directory = new DirectoryInfo(path);
-        if (directory.Name == "__data") directory = directory.Parent;
 
         // If we already have an item in Index that has the same StableContentName, then this is a newer version of something Indexed
-        var content = db.Content.Include(content => content.VersionMeta)
+        content = db.Content
+            .Include(content => content.VersionMeta)
             .FirstOrDefault(content => content.StableContentName == directory!.Parent!.Name);
+
         if (content is not null)
         {
             var version = GetVersion(directory!.Name);
@@ -138,7 +173,7 @@ public class Indexer
                 Logger.Verbose(
                     "Skipped Indexation of {directory} since it isn't an upgrade (Index: {greaterVersion}, Parsed: {lesserVersion})",
                     directory.FullName, content.VersionMeta.Version, version);
-                return;
+                return false;
             }
 
             content.VersionMeta.Version = version;
@@ -146,12 +181,19 @@ public class Indexer
             content.VersionMeta.PatchedBy = [];
 
             db.SaveChanges();
-            return;
+            return false;
         }
 
-        if (!File.Exists(directory!.FullName + "/__data")) return;
+        if (directory.Name == "__data") directory = directory.Parent;
+        if (!File.Exists(directory!.FullName + "/__data")) return false;
+
         content = FileToContent(directory);
-        if (content is null) return;
+        return true;
+    }
+
+    private static void AddToIndexPart2(Content content)
+    {
+        using var db = new IndexContext();
         var indexCopy = db.Content.Include(existingFile => existingFile.VersionMeta)
             .FirstOrDefault(existingFile => existingFile.Id == content.Id);
 
@@ -196,51 +238,51 @@ public class Indexer
         }
 
         return;
+    }
 
-        static bool IsAvatarImposter(string path)
+    private static bool IsAvatarImposter(string path)
+    {
+        AssetsManager manager = new();
+        var bundleInstance = manager.LoadBundleFile(path + "/__data");
+        var assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 0);
+
+        foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoScript))
         {
-            AssetsManager manager = new();
-            var bundleInstance = manager.LoadBundleFile(path + "/__data");
-            var assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 0);
-
-            foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoScript))
-            {
-                var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
-                if (monoScriptBase["m_ClassName"].IsDummy ||
-                    monoScriptBase["m_ClassName"].AsString != "Impostor") continue;
-                return true;
-            }
-
-            return false;
+            var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
+            if (monoScriptBase["m_ClassName"].IsDummy ||
+                monoScriptBase["m_ClassName"].AsString != "Impostor") continue;
+            return true;
         }
 
-        static bool IsWorldHigherUnityVersion(Content IndexedContent, Content newContent)
+        return false;
+    }
+
+    private static bool IsWorldHigherUnityVersion(Content IndexedContent, Content newContent)
+    {
+        // Hack: [Regalia 2023-12-25T03:33:18Z] I'm not paid enough to parse Unity version strings reliably
+        // This assumes the Unity versions always contains the major version at the start, is seperated by a dot and 
+        // the major versions will always be greater to each other. Upcoming Unity 6 will violate this assumption
+        // but I'm betting that service provider won't upgrade anytime soon
+        var indexedContentVersion = ResolveUnityVersion(IndexedContent.VersionMeta.Path).Split(".")[0];
+        var newContentVersion = ResolveUnityVersion(newContent.VersionMeta.Path).Split(".")[0];
+        return int.Parse(newContentVersion) > int.Parse(indexedContentVersion);
+    }
+
+    private static string ResolveUnityVersion(string path)
+    {
+        AssetsManager manager = new();
+        var bundleInstance = manager.LoadBundleFile(path + "/__data");
+        var assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 1);
+
+        foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoBehaviour))
         {
-            // Hack: [Regalia 2023-12-25T03:33:18Z] I'm not paid enough to parse Unity version strings reliably
-            // This assumes the Unity versions always contains the major version at the start, is seperated by a dot and 
-            // the major versions will always be greater to each other. Upcoming Unity 6 will violate this assumption
-            // but I'm betting that service provider won't upgrade anytime soon
-            var indexedContentVersion = ResolveUnityVersion(IndexedContent.VersionMeta.Path).Split(".")[0];
-            var newContentVersion = ResolveUnityVersion(newContent.VersionMeta.Path).Split(".")[0];
-            return int.Parse(newContentVersion) > int.Parse(indexedContentVersion);
+            var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
+            if (monoScriptBase["unityVersion"].IsDummy) continue;
+            return monoScriptBase["unityVersion"].AsString;
         }
 
-        static string ResolveUnityVersion(string path)
-        {
-            AssetsManager manager = new();
-            var bundleInstance = manager.LoadBundleFile(path + "/__data");
-            var assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 1);
-
-            foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoBehaviour))
-            {
-                var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
-                if (monoScriptBase["unityVersion"].IsDummy) continue;
-                return monoScriptBase["unityVersion"].AsString;
-            }
-
-            Logger.Fatal("ResolveUnityVersion: Unable to parse unityVersion out for {path}", path);
-            throw new InvalidOperationException();
-        }
+        Logger.Fatal("ResolveUnityVersion: Unable to parse unityVersion out for {path}", path);
+        throw new InvalidOperationException();
     }
 
 
@@ -316,7 +358,7 @@ public class Indexer
         }
     }
 
-    private static Tuple<DirectoryInfo?, int> GetLatestFileVersion(DirectoryInfo stableNameFolder)
+    private static (DirectoryInfo? HighestVersionDirectory, int HighestVersionNumber) GetLatestFileVersion(DirectoryInfo stableNameFolder)
     {
         var highestVersion = 0;
         DirectoryInfo? highestVersionDir = null;
@@ -328,7 +370,7 @@ public class Indexer
             highestVersionDir = directory;
         }
 
-        return new Tuple<DirectoryInfo?, int>(highestVersionDir, highestVersion);
+        return (highestVersionDir, highestVersion);
     }
 
     private static Content? FileToContent(DirectoryInfo pathToFile)
