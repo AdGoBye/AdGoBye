@@ -15,7 +15,7 @@ using AssetsTools.NET.Extra;
 [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 public static class Blocklist
 {
-    public static Dictionary<string, HashSet<GameObjectInstance>> Blocks;
+    public static Dictionary<string, HashSet<GameObjectInstance>>? Blocks;
     private static readonly ILogger Logger = Log.ForContext(typeof(Blocklist));
 
     public class BlocklistModel

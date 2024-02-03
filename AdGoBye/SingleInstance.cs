@@ -12,9 +12,9 @@
 //2008-01-03: Added Resources
 //2007-12-29: New version
 
+using Serilog;
 using System.Diagnostics;
 using System.IO.Pipes;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -33,6 +33,7 @@ public static class SingleInstance {
     private static Mutex? _mtxFirstInstance;
     private static Thread? _thread;
     private static readonly object _syncRoot = new();
+    private static readonly ILogger _logger = Log.ForContext(typeof(SingleInstance));
 
 
     /// <summary>
@@ -54,11 +55,14 @@ public static class SingleInstance {
         lock (_syncRoot) {
             var isFirstInstance = false;
             try {
-                _mtxFirstInstance = new Mutex(initiallyOwned: true, @"Global\" + MutexName, out isFirstInstance);
+                var mutexName = @"Global\" + MutexName;
+                _mtxFirstInstance = new Mutex(initiallyOwned: true, mutexName, out isFirstInstance);
+                _logger.Debug("Mutex name: {mutexName}", mutexName);
                 if (isFirstInstance == false) { //we need to contact previous instance
-                    var contentObject = new SingleInstanceArguments() {
+                    var contentObject = new InstanceInformation() {
                         CommandLine = Environment.CommandLine,
                         CommandLineArgs = Environment.GetCommandLineArgs(),
+                        ProcessId = Process.GetCurrentProcess().Id
                     };
                     var contentBytes = JsonSerializer.SerializeToUtf8Bytes(contentObject);
                     using var clientPipe = new NamedPipeClientStream(".",
@@ -75,11 +79,11 @@ public static class SingleInstance {
                     _thread.Start();
                 }
             } catch (Exception ex) {
-                Trace.TraceWarning(ex.Message + "  {Medo.Application.SingleInstance}");
+                _logger.Error(ex, "Error in {methodName}", nameof(Attach));
             }
 
             if ((isFirstInstance == false) && (noAutoExit == false)) {
-                Trace.TraceInformation("Exit due to another instance running." + " [" + nameof(SingleInstance) + "]");
+                _logger.Error("Exiting because another instance is already running.");
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
                     Environment.Exit(unchecked((int)0x80004004));  // E_ABORT(0x80004004)
                 } else {
@@ -96,25 +100,15 @@ public static class SingleInstance {
         get {
             lock (_syncRoot) {
                 if (_mutexName == null) {
-                    var assembly = Assembly.GetEntryAssembly();
+                    var programName = "AdGoBye";
 
                     var sbMutextName = new StringBuilder();
-                    var assName = assembly?.GetName().Name;
-                    if (assName != null) {
-                        sbMutextName.Append(assName, 0, Math.Min(assName.Length, 31));
-                        sbMutextName.Append('.');
-                    }
+                    sbMutextName.Append(programName, 0, Math.Min(programName.Length, 31));
+                    sbMutextName.Append('.');
 
                     var sbHash = new StringBuilder();
                     sbHash.AppendLine(Environment.MachineName);
                     sbHash.AppendLine(Environment.UserName);
-                    if (assembly != null) {
-                        sbHash.AppendLine(assembly.FullName);
-                        sbHash.AppendLine(assembly.Location);
-                    } else {
-                        var args = Environment.GetCommandLineArgs();
-                        if (args.Length > 0) { sbHash.AppendLine(args[0]); }
-                    }
                     foreach (var b in SHA256.HashData(Encoding.UTF8.GetBytes(sbHash.ToString()))) {
                         if (sbMutextName.Length == 63) { sbMutextName.AppendFormat("{0:X1}", b >> 4); }  // just take the first nubble
                         if (sbMutextName.Length == 64) { break; }
@@ -146,12 +140,6 @@ public static class SingleInstance {
     }
 
     /// <summary>
-    /// Occurs in first instance when new instance is detected.
-    /// </summary>
-    public static event EventHandler<NewInstanceEventArgs>? NewInstanceDetected;
-
-
-    /// <summary>
     /// Thread function.
     /// </summary>
     private static void Run() {
@@ -163,16 +151,13 @@ public static class SingleInstance {
         while (_mtxFirstInstance != null) {
             try {
                 if (!serverPipe.IsConnected) { serverPipe.WaitForConnection(); }
-                var contentObject = JsonSerializer.Deserialize<SingleInstanceArguments>(serverPipe);
+                var contentObject = JsonSerializer.Deserialize<InstanceInformation>(serverPipe);
                 serverPipe.Disconnect();
                 if (contentObject != null) {
-                    NewInstanceDetected?.Invoke(null,
-                                                new NewInstanceEventArgs(
-                                                    contentObject.CommandLine,
-                                                    contentObject.CommandLineArgs));
+                    _logger.Warning("Another instance attempted to start: {instanceInformation}", JsonSerializer.Serialize(contentObject));
                 }
             } catch (Exception ex) {
-                Trace.TraceWarning(ex.Message + " [" + nameof(SingleInstance) + "]");
+                _logger.Error(ex, "Error in {methodName}", nameof(Run));
                 Thread.Sleep(100);
             }
         }
@@ -180,69 +165,15 @@ public static class SingleInstance {
 
 
     [Serializable]
-    private sealed record SingleInstanceArguments {  // just a storage
-#if NET7_0_OR_GREATER
+    private sealed record InstanceInformation {  // just a storage
         [JsonInclude]
         public required string CommandLine;
 
         [JsonInclude]
         public required string[] CommandLineArgs;
-#else
-        public SingleInstanceArguments() {
-            CommandLine = string.Empty;
-            CommandLineArgs = Array.Empty<string>();
-        }
 
         [JsonInclude]
-        public string CommandLine;
-
-        [JsonInclude]
-        public string[] CommandLineArgs;
-#endif
-    }
-
-}
-
-
-/// <summary>
-/// Arguments for newly detected application instance.
-/// </summary>
-public sealed class NewInstanceEventArgs : EventArgs {
-    /// <summary>
-    /// Creates new instance.
-    /// </summary>
-    /// <param name="commandLine">Command line.</param>
-    /// <param name="commandLineArgs">String array containing the command line arguments in the same format as Environment.GetCommandLineArgs.</param>
-    internal NewInstanceEventArgs(string commandLine, string[] commandLineArgs) {
-        CommandLine = commandLine;
-        _commandLineArgs = new string[commandLineArgs.Length];
-        Array.Copy(commandLineArgs, _commandLineArgs, _commandLineArgs.Length);
-    }
-
-    /// <summary>
-    /// Gets the command line.
-    /// </summary>
-    public string CommandLine { get; }
-
-    private readonly string[] _commandLineArgs;
-    /// <summary>
-    /// Returns a string array containing the command line arguments.
-    /// </summary>
-    public string[] GetCommandLineArgs() {
-        var argCopy = new string[_commandLineArgs.Length];
-        Array.Copy(_commandLineArgs, argCopy, argCopy.Length);
-        return argCopy;
-    }
-
-    /// <summary>
-    /// Gets a string array containing the command line arguments without the name of exectuable.
-    /// </summary>
-    public string[] Args {
-        get {
-            var argCopy = new string[_commandLineArgs.Length - 1];
-            Array.Copy(_commandLineArgs, 1, argCopy, 0, argCopy.Length);
-            return argCopy;
-        }
+        public required int ProcessId;
     }
 
 }
