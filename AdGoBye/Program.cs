@@ -18,7 +18,7 @@ Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
         theme: TemplateTheme.Literate))
     .CreateLogger();
 var logger = Log.ForContext(typeof(Program));
-SingleInstance.Attach(); 
+SingleInstance.Attach();
 
 await using var db = new State.IndexContext();
 db.Database.Migrate();
@@ -41,8 +41,8 @@ if (Blocklist.Blocks == null || Blocklist.Blocks.Count == 0) logger.Information(
 logger.Information("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
     Blocklist.Blocks?.Count, db.Content.Count());
 
-foreach (var content in db.Content.Include(content => content.VersionMeta ))
-{   
+foreach (var content in db.Content.Include(content => content.VersionMeta))
+{
     if (content.Type != ContentType.World) continue;
     logger.Information("Processing {ID} ({director})", content.Id, content.VersionMeta.Path);
     Indexer.PatchContent(content);

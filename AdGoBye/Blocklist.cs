@@ -1,10 +1,10 @@
+using Serilog;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text.Json.Serialization;
 using Tomlyn;
-using Serilog;
 
 namespace AdGoBye;
 
@@ -194,7 +194,7 @@ public static class Blocklist
         {
             if (!deduplicatedBlocklist.TryGetValue(block.WorldId!, out _))
             {
-                deduplicatedBlocklist.Add(block.WorldId!, [..block.GameObjects!]);
+                deduplicatedBlocklist.Add(block.WorldId!, [.. block.GameObjects!]);
                 continue;
             }
 
