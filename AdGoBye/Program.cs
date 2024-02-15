@@ -12,6 +12,8 @@ var levelSwitch = new LoggingLevelSwitch
     MinimumLevel = (LogEventLevel)Settings.Options.LogLevel
 };
 
+Console.OutputEncoding = System.Text.Encoding.UTF8;
+
 Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
     .WriteTo.Console(new ExpressionTemplate(
         "[{@t:HH:mm:ss} {@l:u3} {Coalesce(Substring(SourceContext, LastIndexOf(SourceContext, '.') + 1),'<none>')}] {@m}\n{@x}",
