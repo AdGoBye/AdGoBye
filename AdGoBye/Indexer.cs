@@ -290,7 +290,7 @@ public class Indexer
     public static void PatchContent(Content content)
     {
         if (content.Type is not ContentType.World) return;
-        Logger.Information("Processing {ID} ({director})", content.Id, content.VersionMeta.Path);
+        Logger.Information("Processing {ID} ({directory})", content.Id, content.VersionMeta.Path);
 
         var pluginOverridesBlocklist = false;
         foreach (var plugin in PluginLoader.LoadedPlugins)
