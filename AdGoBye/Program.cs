@@ -46,7 +46,6 @@ logger.Information("Loaded blocks for {blockCount} worlds and indexed {indexCoun
 foreach (var content in db.Content.Include(content => content.VersionMeta))
 {
     if (content.Type != ContentType.World) continue;
-    logger.Information("Processing {ID} ({director})", content.Id, content.VersionMeta.Path);
     Indexer.PatchContent(content);
 }
 

@@ -290,6 +290,7 @@ public class Indexer
     public static void PatchContent(Content content)
     {
         if (content.Type is not ContentType.World) return;
+        Logger.Information("Processing {ID} ({director})", content.Id, content.VersionMeta.Path);
 
         var pluginOverridesBlocklist = false;
         foreach (var plugin in PluginLoader.LoadedPlugins)
@@ -337,6 +338,8 @@ public class Indexer
                 Logger.Error(e, "Failed to patch {ID} ({path})", content.Id, content.VersionMeta.Path);
             }
         }
+
+        Logger.Information("Processed {ID}", content.Id);
     }
 
     private static (DirectoryInfo? HighestVersionDirectory, int HighestVersion) GetLatestFileVersion(DirectoryInfo stableNameFolder)
