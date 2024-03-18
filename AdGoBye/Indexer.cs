@@ -1,13 +1,12 @@
-using AdGoBye.Plugins;
-using AssetsTools.NET.Extra;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Win32;
-using Serilog;
 using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using AdGoBye.Plugins;
+using AssetsTools.NET.Extra;
+using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 namespace AdGoBye;
 
@@ -36,8 +35,6 @@ public record Content
         public required List<string> PatchedBy { get; set; }
     }
 }
-
-
 
 public class Indexer
 {
@@ -342,7 +339,8 @@ public class Indexer
         Logger.Information("Processed {ID}", content.Id);
     }
 
-    private static (DirectoryInfo? HighestVersionDirectory, int HighestVersion) GetLatestFileVersion(DirectoryInfo stableNameFolder)
+    private static (DirectoryInfo? HighestVersionDirectory, int HighestVersion) GetLatestFileVersion(
+        DirectoryInfo stableNameFolder)
     {
         var highestVersion = 0;
         DirectoryInfo? highestVersionDir = null;
@@ -475,7 +473,7 @@ public class Indexer
     private static string GetWorkingDirectory()
     {
         if (!string.IsNullOrEmpty(Settings.Options.WorkingFolder)) return Settings.Options.WorkingFolder;
-        var appName = GetApplicationName();
+        var appName = SteamParser.GetApplicationName();
         var pathToCache = "/" + appName + "/" + appName + "/";
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -488,53 +486,6 @@ public class Indexer
         return appDataFolder + pathToCache;
     }
 
-    private static string GetApplicationName()
-    {
-        const string appid = "438100";
-
-        string? pathToSteamApps = null;
-
-        try
-        {
-            return ExtractAppName();
-        }
-        catch (Exception e)
-        {
-            DieFatally(e);
-        }
-
-        throw new InvalidOperationException();
-
-        string ExtractAppName()
-        {
-            if (OperatingSystem.IsLinux())
-            {
-                pathToSteamApps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) +
-                                               "/.steam/steam/steamapps/");
-            }
-            else if (OperatingSystem.IsWindows())
-            {
-                var registryKey = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Valve\Steam",
-                    "InstallPath",
-                    null);
-
-                pathToSteamApps = registryKey!.ToString()!.Replace("steam.exe", "") + @"\steamapps\";
-            }
-
-            if (pathToSteamApps is null) throw new InvalidOperationException("couldn't determine pathToSteamApps");
-            var line = File.ReadLines(pathToSteamApps + $"appmanifest_{appid}.acf")
-                .First(line => line.Contains("name"));
-            var words = line.Split("\t");
-            return words[3].Replace("\"", "");
-        }
-
-        void DieFatally(Exception e)
-        {
-            Logger.Fatal("We're unable to find your game's working folder (the folder above the cache), " +
-                         "please provide it manually in appsettings.json as 'WorkingFolder'.");
-            throw e;
-        }
-    }
 
     private static string GetCacheDir()
     {
