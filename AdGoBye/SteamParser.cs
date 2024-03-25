@@ -131,10 +131,15 @@ public static class SteamParser
 
     public static string GetPathToSteamRoot()
     {
-        // TODO: Steam running within Flatpak is not guaranteed to have ~/.steam because it runs in an isolated context
         if (OperatingSystem.IsLinux())
         {
-            return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "/.steam/steam/";
+            const string dotSteam = "/.steam/steam/";
+            var homeSteamPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + dotSteam;
+            var flatpakSteamPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) +
+                                   "/.var/app/com.valvesoftware.Steam" + dotSteam;
+
+            if (Directory.Exists(homeSteamPath)) return homeSteamPath;
+            if (Directory.Exists(flatpakSteamPath)) return flatpakSteamPath;
         }
 
         if (OperatingSystem.IsWindows())
