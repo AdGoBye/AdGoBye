@@ -148,6 +148,6 @@ public static class SteamParser
             return registryKey!.ToString()!.Replace("steam.exe", "");
         }
 
-        throw new InvalidOperationException("couldn't determine pathToSteamApps");
+        throw new InvalidOperationException("couldn't determine path to Steam root directory");
     }
 }
