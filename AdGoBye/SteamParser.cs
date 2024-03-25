@@ -31,9 +31,8 @@ public static class SteamParser
 
         void DieFatally(Exception e)
         {
-            Logger.Fatal("We're unable to find your game's working folder (the folder above the cache), " +
-                         "please provide it manually in appsettings.json as 'WorkingFolder'.");
-            throw e;
+            Logger.Fatal(e, "We're unable to find your game's working folder (the folder above the cache), " +
+                            "please provide it manually in appsettings.json as 'WorkingFolder'.");
         }
     }
 
