@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using AdGoBye.Plugins;
 using AssetsTools.NET.Extra;
 using Microsoft.EntityFrameworkCore;
@@ -474,16 +475,25 @@ public class Indexer
     {
         if (!string.IsNullOrEmpty(Settings.Options.WorkingFolder)) return Settings.Options.WorkingFolder;
         var appName = SteamParser.GetApplicationName();
-        var pathToCache = "/" + appName + "/" + appName + "/";
+        var pathToWorkingDir = $"{appName}/{appName}/";
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            return
-                $"/home/{Environment.UserName}/.steam/steam/steamapps/compatdata/438100/pfx/drive_c/users/steamuser/AppData/LocalLow" +
-                pathToCache;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return ConstructLinuxWorkingPath();
 
         var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
             .Replace("Roaming", "LocalLow");
-        return appDataFolder + pathToCache;
+        return $"{appDataFolder}/{pathToWorkingDir}";
+
+        [SupportedOSPlatform("linux")]
+        string ConstructLinuxWorkingPath()
+        {
+            var protonWorkingPath =
+                $"/steamapps/compatdata/{SteamParser.Appid}/pfx/drive_c/users/steamuser/AppData/LocalLow/{pathToWorkingDir}";
+
+            if (string.IsNullOrEmpty(SteamParser.AlternativeLibraryPath))
+                return SteamParser.GetPathToSteamRoot() + protonWorkingPath;
+
+            return SteamParser.AlternativeLibraryPath + protonWorkingPath;
+        }
     }
 
 

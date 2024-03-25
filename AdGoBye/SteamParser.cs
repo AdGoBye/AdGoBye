@@ -7,8 +7,14 @@ namespace AdGoBye;
 [SuppressMessage("ReSharper", "StringLiteralTypo")]
 public static class SteamParser
 {
-    private const string Appid = "438100";
+    public const string Appid = "438100";
     private static readonly ILogger Logger = Log.ForContext(typeof(SteamParser));
+
+    // Not wrong but this would need to be changed to a static constructor.
+    [SuppressMessage("Usage", "CA2211:Non-constant fields should not be visible")]
+    // Contains the path to non-default library path if not empty. Only relevant on Linux where Proton changes
+    // the working path's root.
+    public static string AlternativeLibraryPath = "";
 
     public static string GetApplicationName()
     {
@@ -35,13 +41,21 @@ public static class SteamParser
     {
         var steamRootPath = GetPathToSteamRoot();
 
-        var appName = GetAppNameFromAppmanifest(steamRootPath) ?? GetAppNameFromVrManifest();
+        var appName = GetAppNameFromAppmanifest(steamRootPath);
         if (appName is not null) return appName;
 
-        Logger.Debug("Auto detection failed to get app from default path and vrmanifest");
-        var libraryWithAppId = GetLibraryWithAppId(steamRootPath) ??
-                               throw new InvalidOperationException(
-                                   $"GetLibraryWithAppId failed to find the AppId {Appid} in libraryfolders.vdf");
+        // Unlike Linux, the actual location of the library doesn't matter on Windows so we can test against vrmanifest
+        if (OperatingSystem.IsWindows())
+        {
+            appName = GetAppNameFromVrManifest();
+            if (appName is not null) return appName;
+        }
+
+        Logger.Debug("App is not in default location, trying parse from alternative library path");
+        string libraryWithAppId;
+        AlternativeLibraryPath = libraryWithAppId = GetLibraryWithAppId(steamRootPath) ??
+                                                    throw new InvalidOperationException(
+                                                        $"GetLibraryWithAppId failed to find the AppId {Appid} in libraryfolders.vdf");
 
         appName = GetAppNameFromAppmanifest(libraryWithAppId) ??
                   throw new InvalidOperationException(
@@ -116,12 +130,12 @@ public static class SteamParser
     }
 
 
-    private static string GetPathToSteamRoot()
+    public static string GetPathToSteamRoot()
     {
+        // TODO: Steam running within Flatpak is not guaranteed to have ~/.steam because it runs in an isolated context
         if (OperatingSystem.IsLinux())
         {
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) +
-                                "/.steam/steam/");
+            return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "/.steam/steam/";
         }
 
         if (OperatingSystem.IsWindows())
