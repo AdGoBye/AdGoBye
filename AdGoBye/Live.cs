@@ -131,7 +131,7 @@ public static class Live
 
     private static StreamReader GetLogStream(string logFile)
     {
-        var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         var sr = new StreamReader(fs);
         sr.BaseStream.Seek(0, SeekOrigin.End);
         return sr;
