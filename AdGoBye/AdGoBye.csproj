@@ -9,6 +9,7 @@
         <Title>AdGoBye</Title>
         <Authors>AdGoBye Team</Authors>
         <Company>AdGoBye Team</Company>
+        <Version>2.1.0</Version>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)'=='Release'">
