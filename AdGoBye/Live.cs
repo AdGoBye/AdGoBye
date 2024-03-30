@@ -1,5 +1,5 @@
-using Serilog;
 using System.Diagnostics.CodeAnalysis;
+using Serilog;
 
 // ReSharper disable FunctionNeverReturns
 
@@ -7,10 +7,10 @@ namespace AdGoBye;
 
 public static class Live
 {
-    private static readonly ILogger Logger = Log.ForContext(typeof(Live));
-    private static readonly EventWaitHandle Ewh = new(true, EventResetMode.ManualReset);
     private const string LoadStartIndicator = "[Behaviour] Preparing assets...";
     private const string LoadStopIndicator = "Entering world";
+    private static readonly ILogger Logger = Log.ForContext(typeof(Live));
+    private static readonly EventWaitHandle Ewh = new(true, EventResetMode.ManualReset);
 
     public static void WatchNewContent(string path)
     {
@@ -125,13 +125,14 @@ public static class Live
                         break;
                 }
             }
+
             Thread.Sleep(300);
         }
     }
 
     private static StreamReader GetLogStream(string logFile)
     {
-        var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         var sr = new StreamReader(fs);
         sr.BaseStream.Seek(0, SeekOrigin.End);
         return sr;
