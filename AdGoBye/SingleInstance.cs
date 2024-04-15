@@ -12,7 +12,6 @@
 //2008-01-03: Added Resources
 //2007-12-29: New version
 
-using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -136,7 +135,7 @@ public static class SingleInstance
                     {
                         CommandLine = Environment.CommandLine,
                         CommandLineArgs = Environment.GetCommandLineArgs(),
-                        ProcessId = Process.GetCurrentProcess().Id
+                        ProcessId = Environment.ProcessId
                     };
                     var contentBytes = JsonSerializer.SerializeToUtf8Bytes(contentObject);
                     using var clientPipe = new NamedPipeClientStream(".",
