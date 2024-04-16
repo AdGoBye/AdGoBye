@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Reflection;
 using System.Text.Json;
-using SemVersion;
+using Semver;
 using Serilog;
 
 namespace AdGoBye;
@@ -26,13 +26,13 @@ public static class Updater
 
         if (GetVersionFromRemote() is not { } remoteVersion) return;
 
-        var remoteVersionSemVer = SemanticVersion.Parse(remoteVersion.tag_name.Replace("v", ""));
-        var localVersionSemVer = SemanticVersion.Parse(GetSelfVersion());
+        var remoteVersionSemVer = SemVersion.Parse(remoteVersion.tag_name.Replace("v", ""));
+        var localVersionSemVer = SemVersion.Parse(GetSelfVersion());
         Logger.Debug("Remote: {remote}, Local: {local} ", remoteVersion.tag_name, localVersionSemVer);
-        if (remoteVersionSemVer > localVersionSemVer)
+        if (!localVersionSemVer.IsPrerelease && localVersionSemVer.ComparePrecedenceTo(remoteVersionSemVer) <= 0)
         {
             Logger.Information("Version {remoteVersion} is out, you are using {localVersion}, download it at {url}",
-                remoteVersion.tag_name, localVersionSemVer, remoteVersion.html_url);
+                remoteVersion.tag_name, localVersionSemVer.WithoutMetadata(), remoteVersion.html_url);
             return;
         }
 
