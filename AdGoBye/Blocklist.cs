@@ -1,15 +1,17 @@
-using Serilog;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using AssetsTools.NET;
+using AssetsTools.NET.Extra;
+using Serilog;
 using Tomlyn;
 
 namespace AdGoBye;
-
-using AssetsTools.NET;
-using AssetsTools.NET.Extra;
 
 // The auto properties are implicitly used by Tomlyn, removing them breaks parsing.
 [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
@@ -47,6 +49,7 @@ public static class Blocklist
         public required double Y { get; init; }
         public required double Z { get; init; }
     }
+
     public class NetworkBlocklist
     {
         [Key]
@@ -205,7 +208,7 @@ public static class Blocklist
     }
 
 
-    public static void Patch(string assetPath, GameObjectInstance[] gameObjectsToDisable)
+    public static List<GameObjectInstance>? Patch(string assetPath, GameObjectInstance[] gameObjectsToDisable)
     {
         AssetsManager manager = new();
         var bundleInstance = manager.LoadBundleFile(assetPath);
@@ -243,7 +246,7 @@ public static class Blocklist
                 "Following blocklist objects weren't disabled: {@UnpatchedList}" +
                 "\nThis can mean that these blocklist entries are outdated, consider informing the maintainer",
                 unpatchedObjects);
-        if (Settings.Options.DryRun) return;
+        if (Settings.Options.DryRun) return unpatchedObjects.Count != 0 ? unpatchedObjects : null;
         Logger.Information("Done, writing changes as bundle");
         using var writer = new AssetsFileWriter(assetPath + ".clean");
         bundle.Write(writer);
@@ -254,7 +257,7 @@ public static class Blocklist
 
 
         File.Replace(assetPath + ".clean", assetPath, assetPath + ".bak");
-        return;
+        return unpatchedObjects.Count != 0 ? unpatchedObjects : null;
 
         bool DoesParentMatch(AssetExternal FatherPos, AssetsFileInstance assetsFileInstance,
             GameObjectInstance blocklistGameObject)
@@ -315,5 +318,48 @@ public static class Blocklist
 
             return true;
         }
+    }
+
+    private static CallbackObject? ConstructUnmatchedPayload(string wid,
+        IEnumerable<GameObjectInstance> unmatchedObjects)
+    {
+        var hashedWorldId = SHA256.HashData(Encoding.Unicode.GetBytes(wid));
+        var hexHashedWorldId = Convert.ToHexString(hashedWorldId);
+        var hashedObjects = new List<string>();
+        // ReSharper disable once LoopCanBeConvertedToQuery - Query turns preparedUnmatchedObjects into list<string?>
+        foreach (var gameObject in unmatchedObjects)
+        {
+            // TODO: We can pass the byte array to CallbackObject directly, but this turns it into a b64 I can't replicate
+            var serialized = JsonSerializer.SerializeToUtf8Bytes(gameObject); // Jesus nut
+            var serializedHash = SHA256.HashData(serialized);
+            var hexHash = Convert.ToHexString(serializedHash);
+            hashedObjects.Add(hexHash);
+        }
+
+        if (hashedObjects.Count is 0) return null;
+
+        return new CallbackObject
+        {
+            Version = 0,
+            WorldId = hexHashedWorldId,
+            UnmatchedObjects = hashedObjects
+        };
+    }
+
+    public static void SendUnpatchedObjects(string wid, IEnumerable<GameObjectInstance> unmatchedObjects)
+    {
+        var payload = ConstructUnmatchedPayload(wid, unmatchedObjects);
+        if (payload is null) return;
+        var serializedPayload = JsonSerializer.Serialize(payload);
+
+        Logger.Verbose("Blocklist payload: {object}", serializedPayload);
+        // TODO: This should be sent to remote at Settings.Options.BlocklistUnmatchedServer
+    }
+
+    public class CallbackObject
+    {
+        public required int Version { get; set; }
+        public required string WorldId { get; set; }
+        public required List<string> UnmatchedObjects { get; set; }
     }
 }
