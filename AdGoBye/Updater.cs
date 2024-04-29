@@ -35,7 +35,7 @@ public static class Updater
         {
             Logger.Information("Version {remoteVersion} is out, you are using {localVersion}, download it at {url}",
                 remoteVersion.tag_name, localVersionSemVer.WithoutMetadata(), remoteVersion.html_url);
-            UpgradeSelf(remoteVersion);
+            if (Settings.Options.AutoUpdateOnNewVersion) UpgradeSelf(remoteVersion);
             return;
         }
 
