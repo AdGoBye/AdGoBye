@@ -87,15 +87,26 @@ public static class Updater
             var process = new Process();
             process.StartInfo.FileName = Environment.ProcessPath;
             process.StartInfo.UseShellExecute = false;
-            process.Start();
+            process.StartInfo.RedirectStandardOutput = true;
+            process.StartInfo.RedirectStandardError = true;
+            process.StartInfo.CreateNoWindow = true;
+            // TODO: We don't get coloring from the output of this, we should either find a way to fix that
+            //       or tell the user that they will not have coloring and this is expected
+            process.OutputDataReceived += (_, data) => { Console.WriteLine(data.Data); };
+            process.ErrorDataReceived += (_, data) => { Console.WriteLine(data.Data); };
 
-            Logger.Verbose("We upgraded and forked off, let's clean up and get out of here!");
+            Logger.Verbose("We upgraded, cleaning up and passing over to child");
             Directory.Delete($"{zipPath}-extracted", true);
             File.Delete(zipPath);
             File.Delete(Environment.ProcessPath + ".old");
-        }
+            // TODO: We have to undo our mutex here, else the relaunch will get blocked
 
-        Environment.Exit(-1);
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            process.WaitForExit();
+            Environment.Exit(process.ExitCode);
+        }
     }
 
     private static bool CheckConnectivity()
