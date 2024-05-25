@@ -83,8 +83,16 @@ public class Indexer
             // We know the content is still being tracked but we don't know if its actually relevant
             // so we'll resolve every version to determine the highest and mutate based on that
             var (highestVersionDir, highestVersion) = GetLatestFileVersion(directoryMeta.Parent);
+            if (highestVersionDir is null)
+            {
+                Logger.Warning(
+                    "{parentDir} ({id}) is lingering with no content versions and should be deleted, Skipping for now",
+                    directoryMeta.Parent, content.Id);
+                continue;
+            }
 
-            if (!File.Exists(highestVersionDir!.FullName + "/__data"))
+
+            if (!File.Exists(highestVersionDir.FullName + "/__data"))
             {
                 db.Remove(content);
                 Log.Warning(
@@ -328,7 +336,9 @@ public class Indexer
         {
             try
             {
-                Blocklist.Patch(content.VersionMeta.Path + "/__data", block.Value.ToArray());
+                var unmatchedObjects = Blocklist.Patch(content.VersionMeta.Path + "/__data", block.Value.ToArray());
+                if (Settings.Options.SendUnmatchedObjectsToDevs && unmatchedObjects is not null)
+                    Blocklist.SendUnpatchedObjects(content, unmatchedObjects);
                 if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
             }
             catch (Exception e)

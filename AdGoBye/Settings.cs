@@ -17,6 +17,10 @@ public static class Settings
     public class SettingsOptions
     {
         public string[]? Allowlist { get; set; }
+
+        public bool SendUnmatchedObjectsToDevs { get; set; }
+
+        public string? BlocklistUnmatchedServer { get; set; }
         public string? WorkingFolder { get; set; }
         public bool EnableUpdateCheck { get; set; }
         public int LogLevel { get; set; }

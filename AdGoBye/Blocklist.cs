@@ -1,15 +1,18 @@
-using Serilog;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using AssetsTools.NET;
+using AssetsTools.NET.Extra;
+using Serilog;
 using Tomlyn;
 
 namespace AdGoBye;
-
-using AssetsTools.NET;
-using AssetsTools.NET.Extra;
 
 // The auto properties are implicitly used by Tomlyn, removing them breaks parsing.
 [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
@@ -47,6 +50,7 @@ public static class Blocklist
         public required double Y { get; init; }
         public required double Z { get; init; }
     }
+
     public class NetworkBlocklist
     {
         [Key]
@@ -205,7 +209,7 @@ public static class Blocklist
     }
 
 
-    public static void Patch(string assetPath, GameObjectInstance[] gameObjectsToDisable)
+    public static List<GameObjectInstance>? Patch(string assetPath, GameObjectInstance[] gameObjectsToDisable)
     {
         AssetsManager manager = new();
         var bundleInstance = manager.LoadBundleFile(assetPath);
@@ -243,7 +247,7 @@ public static class Blocklist
                 "Following blocklist objects weren't disabled: {@UnpatchedList}" +
                 "\nThis can mean that these blocklist entries are outdated, consider informing the maintainer",
                 unpatchedObjects);
-        if (Settings.Options.DryRun) return;
+        if (Settings.Options.DryRun) return unpatchedObjects.Count != 0 ? unpatchedObjects : null;
         Logger.Information("Done, writing changes as bundle");
         using var writer = new AssetsFileWriter(assetPath + ".clean");
         bundle.Write(writer);
@@ -254,7 +258,7 @@ public static class Blocklist
 
 
         File.Replace(assetPath + ".clean", assetPath, assetPath + ".bak");
-        return;
+        return unpatchedObjects.Count != 0 ? unpatchedObjects : null;
 
         bool DoesParentMatch(AssetExternal FatherPos, AssetsFileInstance assetsFileInstance,
             GameObjectInstance blocklistGameObject)
@@ -315,5 +319,49 @@ public static class Blocklist
 
             return true;
         }
+    }
+
+    private static CallbackObject ConstructUnmatchedPayload(Content content,
+        IEnumerable<GameObjectInstance> unmatchedObjects)
+    {
+        return new CallbackObject
+        {
+            Version = content.VersionMeta.Version,
+            WorldId = SHA256.HashData(Encoding.ASCII.GetBytes(content.Id)),
+            UnmatchedObjects = unmatchedObjects.Select(gameObject => JsonSerializer.SerializeToUtf8Bytes(gameObject))
+                .Select(SHA256.HashData).ToList()
+        };
+    }
+
+    public static async void SendUnpatchedObjects(Content content, IEnumerable<GameObjectInstance> unmatchedObjects)
+    {
+        var payload = ConstructUnmatchedPayload(content, unmatchedObjects);
+        Logger.Verbose("Callback Payload: {@payload}", payload);
+
+        using var client = new HttpClient();
+        HttpResponseMessage response;
+        try
+        {
+            response = await client.PostAsJsonAsync(Settings.Options.BlocklistUnmatchedServer, payload);
+        }
+        catch (Exception e)
+        {
+            Logger.Error("Blocklist callback exception: {e}", e);
+            return;
+        }
+
+        if (response.StatusCode != HttpStatusCode.NoContent)
+            Logger.Warning("Blocklist callback failed:  [{statusCode}] {body}", response.StatusCode,
+                await response.Content.ReadAsStringAsync());
+        else
+            Logger.Verbose("Blocklist callback response: [{statusCode}] {body}", response.StatusCode,
+                await response.Content.ReadAsStringAsync());
+    }
+
+    public class CallbackObject
+    {
+        public required int Version { get; set; }
+        public required byte[] WorldId { get; set; }
+        public required List<byte[]> UnmatchedObjects { get; set; }
     }
 }

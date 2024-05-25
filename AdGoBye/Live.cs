@@ -29,7 +29,7 @@ public static class Live
           Instead, we track for __info and replace it with __data.
           This has the implication that info is always created alongside data.
           This might also break if the detection failure is caused intentionally by adversarial motive.
- */
+        */
         watcher.Created += (_, e) => Task.Run(() => ParseFile(e.FullPath.Replace("__info", "__data")));
         watcher.Deleted += (_, e) => Task.Run(
             () =>
