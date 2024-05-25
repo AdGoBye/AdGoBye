@@ -16,7 +16,7 @@ public static class Updater
     private static readonly HttpClient Client = CreateHttpClient();
     private static readonly ILogger Logger = Log.ForContext(typeof(Updater));
 
-    public static void UpdateConditionally()
+    public static void CheckUpdates()
     {
         if (!CheckConnectivity())
         {
