@@ -46,7 +46,14 @@ public static class Updater
         var webRequest = new HttpRequestMessage(HttpMethod.Get, ConnectivityCheckUrl);
         // Captive portals might return 200, Ubuntu returns 204
         // If you're changing the provider, you may have to change this to IsSuccessStatusCode
-        return Client.Send(webRequest).StatusCode is HttpStatusCode.NoContent;
+        try
+        {
+            return Client.Send(webRequest).StatusCode is HttpStatusCode.NoContent;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static GithubRelease? GetVersionFromRemote()
