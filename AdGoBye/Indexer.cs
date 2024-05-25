@@ -330,7 +330,7 @@ public class Indexer
             {
                 var unmatchedObjects = Blocklist.Patch(content.VersionMeta.Path + "/__data", block.Value.ToArray());
                 if (Settings.Options.SendUnmatchedObjectsToDevs && unmatchedObjects is not null)
-                    Blocklist.SendUnpatchedObjects(content.Id, unmatchedObjects);
+                    Blocklist.SendUnpatchedObjects(content, unmatchedObjects);
                 if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
             }
             catch (Exception e)

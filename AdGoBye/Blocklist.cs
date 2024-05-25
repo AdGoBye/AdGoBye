@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -320,46 +321,47 @@ public static class Blocklist
         }
     }
 
-    private static CallbackObject? ConstructUnmatchedPayload(string wid,
+    private static CallbackObject ConstructUnmatchedPayload(Content content,
         IEnumerable<GameObjectInstance> unmatchedObjects)
     {
-        var hashedWorldId = SHA256.HashData(Encoding.Unicode.GetBytes(wid));
-        var hexHashedWorldId = Convert.ToHexString(hashedWorldId);
-        var hashedObjects = new List<string>();
-        // ReSharper disable once LoopCanBeConvertedToQuery - Query turns preparedUnmatchedObjects into list<string?>
-        foreach (var gameObject in unmatchedObjects)
-        {
-            // TODO: We can pass the byte array to CallbackObject directly, but this turns it into a b64 I can't replicate
-            var serialized = JsonSerializer.SerializeToUtf8Bytes(gameObject); // Jesus nut
-            var serializedHash = SHA256.HashData(serialized);
-            var hexHash = Convert.ToHexString(serializedHash);
-            hashedObjects.Add(hexHash);
-        }
-
-        if (hashedObjects.Count is 0) return null;
-
         return new CallbackObject
         {
-            Version = 0,
-            WorldId = hexHashedWorldId,
-            UnmatchedObjects = hashedObjects
+            Version = content.VersionMeta.Version,
+            WorldId = SHA256.HashData(Encoding.ASCII.GetBytes(content.Id)),
+            UnmatchedObjects = unmatchedObjects.Select(gameObject => JsonSerializer.SerializeToUtf8Bytes(gameObject))
+                .Select(SHA256.HashData).ToList()
         };
     }
 
-    public static void SendUnpatchedObjects(string wid, IEnumerable<GameObjectInstance> unmatchedObjects)
+    public static async void SendUnpatchedObjects(Content content, IEnumerable<GameObjectInstance> unmatchedObjects)
     {
-        var payload = ConstructUnmatchedPayload(wid, unmatchedObjects);
-        if (payload is null) return;
-        var serializedPayload = JsonSerializer.Serialize(payload);
+        var payload = ConstructUnmatchedPayload(content, unmatchedObjects);
+        Logger.Verbose("Callback Payload: {@payload}", payload);
 
-        Logger.Verbose("Blocklist payload: {object}", serializedPayload);
-        // TODO: This should be sent to remote at Settings.Options.BlocklistUnmatchedServer
+        using var client = new HttpClient();
+        HttpResponseMessage response;
+        try
+        {
+            response = await client.PostAsJsonAsync(Settings.Options.BlocklistUnmatchedServer, payload);
+        }
+        catch (Exception e)
+        {
+            Logger.Error("Blocklist callback exception: {e}", e);
+            return;
+        }
+
+        if (response.StatusCode != HttpStatusCode.NoContent)
+            Logger.Warning("Blocklist callback failed:  [{statusCode}] {body}", response.StatusCode,
+                await response.Content.ReadAsStringAsync());
+        else
+            Logger.Verbose("Blocklist callback response: [{statusCode}] {body}", response.StatusCode,
+                await response.Content.ReadAsStringAsync());
     }
 
     public class CallbackObject
     {
         public required int Version { get; set; }
-        public required string WorldId { get; set; }
-        public required List<string> UnmatchedObjects { get; set; }
+        public required byte[] WorldId { get; set; }
+        public required List<byte[]> UnmatchedObjects { get; set; }
     }
 }
