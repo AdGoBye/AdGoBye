@@ -22,6 +22,7 @@ public static class Settings
 
         public string? BlocklistUnmatchedServer { get; set; }
         public string? WorkingFolder { get; set; }
+        public bool EnableUpdateCheck { get; set; }
         public int LogLevel { get; set; }
         public bool EnableLive { get; set; }
         public bool DryRun { get; set; }

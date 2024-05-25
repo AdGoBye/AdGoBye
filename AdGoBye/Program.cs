@@ -21,6 +21,7 @@ Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
     .CreateLogger();
 var logger = Log.ForContext(typeof(Program));
 SingleInstance.Attach();
+if (Settings.Options.EnableUpdateCheck) Updater.CheckUpdates();
 
 await using var db = new State.IndexContext();
 db.Database.Migrate();
@@ -39,7 +40,8 @@ foreach (var plugin in PluginLoader.LoadedPlugins)
         logger.Information("Responsible for {IDs}", plugin.Instance.ResponsibleForContentIds());
 }
 
-if (Blocklist.Blocks == null || Blocklist.Blocks.Count == 0) logger.Information("No blocklist has been loaded, is this intentional?");
+if (Blocklist.Blocks == null || Blocklist.Blocks.Count == 0)
+    logger.Information("No blocklist has been loaded, is this intentional?");
 logger.Information("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
     Blocklist.Blocks?.Count, db.Content.Count());
 
