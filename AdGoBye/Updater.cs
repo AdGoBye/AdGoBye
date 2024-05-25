@@ -31,7 +31,8 @@ public static class Updater
         Logger.Debug("Remote: {remote}, Local: {local} ", remoteVersion.tag_name, localVersionSemVer);
         if (!localVersionSemVer.IsPrerelease && localVersionSemVer.ComparePrecedenceTo(remoteVersionSemVer) <= 0)
         {
-            Logger.Information("Version {remoteVersion} is out, you are using {localVersion}, download it at {url}",
+            Logger.Information(
+                "New version {remoteVersion} is out, you are using {localVersion}, download the new version at {url}",
                 remoteVersion.tag_name, localVersionSemVer.WithoutMetadata(), remoteVersion.html_url);
             return;
         }
