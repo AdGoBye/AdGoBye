@@ -95,7 +95,7 @@ public class Indexer
             if (!File.Exists(highestVersionDir.FullName + "/__data"))
             {
                 db.Remove(content);
-                Log.Warning(
+                Logger.Warning(
                     "{directory} is highest version but doesn't have __data, hell might have frozen over. Removed from Index",
                     highestVersionDir.FullName);
                 continue;
@@ -444,7 +444,7 @@ public class Indexer
         {
             if (gameObjectBase["blueprintId"].AsString == "")
             {
-                Log.Warning("{directory} has no embedded ID for some reason, skipping this…", path);
+                Logger.Warning("{directory} has no embedded ID for some reason, skipping this…", path);
                 return null;
             }
 
