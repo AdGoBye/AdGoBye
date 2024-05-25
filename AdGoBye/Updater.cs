@@ -1,6 +1,4 @@
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.IO.Compression;
 using System.Net;
 using System.Reflection;
 using System.Text.Json;
@@ -18,7 +16,7 @@ public static class Updater
     private static readonly HttpClient Client = CreateHttpClient();
     private static readonly ILogger Logger = Log.ForContext(typeof(Updater));
 
-    public static void CheckForUpdate()
+    public static void UpdateConditionally()
     {
         if (!CheckConnectivity())
         {
@@ -31,82 +29,16 @@ public static class Updater
         var remoteVersionSemVer = SemVersion.Parse(remoteVersion.tag_name.Replace("v", ""));
         var localVersionSemVer = SemVersion.Parse(GetSelfVersion());
         Logger.Debug("Remote: {remote}, Local: {local} ", remoteVersion.tag_name, localVersionSemVer);
-        if (localVersionSemVer.ComparePrecedenceTo(remoteVersionSemVer) <= 0)
+        if (!localVersionSemVer.IsPrerelease && localVersionSemVer.ComparePrecedenceTo(remoteVersionSemVer) <= 0)
         {
             Logger.Information("Version {remoteVersion} is out, you are using {localVersion}, download it at {url}",
                 remoteVersion.tag_name, localVersionSemVer.WithoutMetadata(), remoteVersion.html_url);
-            if (Settings.Options.AutoUpdateOnNewVersion) UpgradeSelf(remoteVersion);
             return;
         }
 
         // If we know our version is the latest, conditional requests save on bandwidth and ratelimits
         // https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#use-conditional-requests-if-appropriate
         SaveETag(remoteVersion.ETag);
-    }
-
-    private static void UpgradeSelf(GithubRelease release)
-    {
-        Logger.Information("Upgrading your installation to latest release");
-        var osString = "";
-        var executableName = "AdGoBye";
-        if (OperatingSystem.IsWindows())
-        {
-            osString = "win";
-            executableName += ".exe";
-        }
-
-        if (OperatingSystem.IsLinux()) osString = "linux";
-
-        if (Environment.ProcessPath is null)
-        {
-            Log.Error("Unable to get own path, you will have to upgrade manually.");
-            return;
-        }
-
-        foreach (var asset in release.assets)
-        {
-            if (!asset.name.Contains(osString)) continue;
-            var downloadedFile = Client.GetAsync(asset.browser_download_url).Result;
-            if (!downloadedFile.IsSuccessStatusCode)
-            {
-                Logger.Error("Downloading release failed with {statusCode}, you will have to upgrade manually.",
-                    downloadedFile.StatusCode);
-                return;
-            }
-
-            var zipPath = $"{Path.GetTempPath()}/{asset.name}";
-            using var file = new FileStream(zipPath, FileMode.Create);
-            downloadedFile.Content.CopyToAsync(file).Wait();
-            file.Close(); // We have to close explicitly for Windows derp
-            ZipFile.ExtractToDirectory(zipPath, zipPath + "-extracted");
-
-            Log.Verbose("Upgrading now: {path}", Environment.ProcessPath);
-            File.Move(Environment.ProcessPath, Environment.ProcessPath + ".old");
-            File.Move($"{zipPath}-extracted/{executableName}", Environment.ProcessPath);
-
-            var process = new Process();
-            process.StartInfo.FileName = Environment.ProcessPath;
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.RedirectStandardError = true;
-            process.StartInfo.CreateNoWindow = true;
-            // TODO: We don't get coloring from the output of this, we should either find a way to fix that
-            //       or tell the user that they will not have coloring and this is expected
-            process.OutputDataReceived += (_, data) => { Console.WriteLine(data.Data); };
-            process.ErrorDataReceived += (_, data) => { Console.WriteLine(data.Data); };
-
-            Logger.Verbose("We upgraded, cleaning up and passing over to child");
-            Directory.Delete($"{zipPath}-extracted", true);
-            File.Delete(zipPath);
-            File.Delete(Environment.ProcessPath + ".old");
-            // TODO: We have to undo our mutex here, else the relaunch will get blocked
-
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            process.WaitForExit();
-            Environment.Exit(process.ExitCode);
-        }
     }
 
     private static bool CheckConnectivity()
@@ -189,13 +121,5 @@ public class GithubRelease
     public string html_url { get; init; }
     public string tag_name { get; init; }
     public string ETag { get; set; }
-    public Assets[] assets { get; init; }
-
-
-    public class Assets
-    {
-        public string name { get; init; }
-        public string browser_download_url { get; init; }
-    }
 }
 #pragma warning restore CS8618

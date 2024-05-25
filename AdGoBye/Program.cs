@@ -21,7 +21,7 @@ Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
     .CreateLogger();
 var logger = Log.ForContext(typeof(Program));
 SingleInstance.Attach();
-if (Settings.Options.EnableUpdateCheck) Updater.CheckForUpdate();
+if (Settings.Options.EnableUpdateCheck) Updater.UpdateConditionally();
 
 await using var db = new State.IndexContext();
 db.Database.Migrate();
