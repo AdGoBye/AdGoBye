@@ -18,7 +18,7 @@ public static class Updater
 
     public static void CheckUpdates()
     {
-        if (!CheckConnectivity())
+        if (HasConnectivity())
         {
             Logger.Warning("We appear to be offline, skipping update check.");
             return;
@@ -42,7 +42,7 @@ public static class Updater
         SaveETag(remoteVersion.ETag);
     }
 
-    private static bool CheckConnectivity()
+    private static bool HasConnectivity()
     {
         var webRequest = new HttpRequestMessage(HttpMethod.Get, ConnectivityCheckUrl);
         // Captive portals might return 200, Ubuntu returns 204
