@@ -36,4 +36,9 @@ public class BasePlugin : IPlugin
     public void PostPatch()
     {
     }
+
+    public bool WantsIndexerTracking()
+    {
+        return true;
+    }
 }

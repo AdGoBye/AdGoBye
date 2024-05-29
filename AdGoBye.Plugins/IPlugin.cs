@@ -51,4 +51,15 @@ public interface IPlugin
     /// Initialize is a function that Plugins can use to clean up after themselves after execution.
     /// </summary>
     void PostPatch();
+
+    /// <summary>
+    /// WantsIndexerTracking allows a Plugin to pick if it wants the Indexer to skip it when the Indexer thinks
+    /// the Plugin has already patched the file.
+    /// </summary>
+    /// <remarks>
+    /// When a Plugin patches a file, the Indexer keeps track of the Plugin that modified that version of the file,
+    /// which non-deterministic and exotically designed Plugins may not benifit from.
+    ///</remarks>
+    /// <returns>Boolean indicating if the Indexer should skip if thought already patched.</returns>
+    bool WantsIndexerTracking();
 }

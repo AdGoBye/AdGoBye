@@ -307,7 +307,8 @@ public class Indexer
         {
             try
             {
-                if (content.VersionMeta.PatchedBy.Contains(plugin.Name)) continue;
+                if (plugin.Instance.WantsIndexerTracking() &&
+                    content.VersionMeta.PatchedBy.Contains(plugin.Name)) continue;
 
                 var pluginApplies = plugin.Instance.PluginType() is EPluginType.Global;
                 if (!pluginApplies && plugin.Instance.PluginType() is EPluginType.ContentSpecific)
@@ -324,8 +325,10 @@ public class Indexer
                     pluginApplies = false;
 
                 if (pluginApplies) plugin.Instance.Patch(ref container, Settings.Options.DryRun);
-                // TODO: Provide escape hatch here
-                if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add(plugin.Name);
+
+                if (!Settings.Options.DryRun && plugin.Instance.WantsIndexerTracking())
+                    content.VersionMeta.PatchedBy.Add(plugin.Name);
+
                 plugin.Instance.PostPatch();
             }
             catch (Exception e)
