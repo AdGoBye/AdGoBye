@@ -350,6 +350,7 @@ public class Indexer
             }
         }
 
+        container.Bundle.file.BlockAndDirInfo.DirectoryInfos[1].SetNewData(container.AssetsFile.file);
         using var writer = new AssetsFileWriter(file + ".clean");
         container.Bundle.file.Write(writer);
         // Moving the file without closing our access fails on NT.
