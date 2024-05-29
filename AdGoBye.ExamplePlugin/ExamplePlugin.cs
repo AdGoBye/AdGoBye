@@ -1,5 +1,4 @@
 ﻿using AdGoBye.Plugins;
-using AssetsTools.NET;
 using AssetsTools.NET.Extra;
 using Serilog;
 
@@ -14,26 +13,21 @@ public class ExamplePlugin : BasePlugin
         return EPluginType.Global;
     }
 
-    public override EPatchResult Patch(string contentId, string dataDirectoryPath)
+    public override EPatchResult Patch(ref ContentFileContainer fileContainer, bool dryRunRequested)
     {
-        var manager = new AssetsManager();
-        var dataLocation = dataDirectoryPath + "/__data";
         try
         {
-            var bundleInstance = manager.LoadBundleFile(dataLocation);
-            var bundle = bundleInstance.file;
-
-            var assetFileInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 1);
-            var assetsFile = assetFileInstance.file;
+            var assetsFile = fileContainer.AssetsFile.file;
 
             var foundOneChair = false;
             foreach (var monoBehaviour in assetsFile.GetAssetsOfType(AssetClassID.MonoBehaviour))
             {
-                var monoBehaviourInfo = manager.GetBaseField(assetFileInstance, monoBehaviour);
+                var monoBehaviourInfo = fileContainer.Manager.GetBaseField(fileContainer.AssetsFile, monoBehaviour);
                 if (monoBehaviourInfo["PlayerMobility"].IsDummy) continue;
 
                 var parentGameObject = assetsFile.GetAssetInfo(monoBehaviourInfo["m_GameObject.m_PathID"].AsLong);
-                var parentGameObjectInfo = manager.GetBaseField(assetFileInstance, parentGameObject);
+                var parentGameObjectInfo =
+                    fileContainer.Manager.GetBaseField(fileContainer.AssetsFile, parentGameObject);
 
                 if (parentGameObjectInfo["m_IsActive"].AsBool is false) continue;
                 Logger.Verbose("Found chair on '{name}' [{PathID}], disabling", parentGameObjectInfo["m_Name"].AsString,
@@ -51,15 +45,6 @@ public class ExamplePlugin : BasePlugin
                 Logger.Verbose("Skipping, no chairs found");
                 return EPatchResult.Skipped;
             }
-
-            Logger.Verbose("Writing changes to bundle");
-            bundle.BlockAndDirInfo.DirectoryInfos[1].SetNewData(assetsFile);
-            using var writer = new AssetsFileWriter(dataLocation + ".mod");
-            bundle.Write(writer);
-
-            writer.Close();
-            assetsFile.Close();
-            bundle.Close();
         }
         catch (Exception e)
         {
@@ -67,7 +52,6 @@ public class ExamplePlugin : BasePlugin
             return EPatchResult.Fail;
         }
 
-        File.Replace(dataLocation + ".mod", dataLocation, null);
         return EPatchResult.Success;
     }
 }
