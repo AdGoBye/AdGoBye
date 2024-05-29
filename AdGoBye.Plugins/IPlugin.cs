@@ -40,4 +40,15 @@ public interface IPlugin
     /// <returns>A <see cref="EVerifyResult" /> that signifies the result of the plugin's verify operation.
     ///          Non-<see cref="EVerifyResult.Success"/> returns will skip this Plugin from being executed. </returns>
     EVerifyResult Verify(ref readonly ContentFileContainer fileContainer);
+
+    /// <summary>
+    /// Initialize is a function that Plugins can use to set up their environment before executing
+    /// <see cref="Patch"/> and <see cref="Verify"/> functions.
+    /// </summary>
+    void Initialize();
+
+    /// <summary>
+    /// Initialize is a function that Plugins can use to clean up after themselves after execution.
+    /// </summary>
+    void PostPatch();
 }

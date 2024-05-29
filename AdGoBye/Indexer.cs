@@ -318,12 +318,15 @@ public class Indexer
 
                 pluginOverridesBlocklist = plugin.Instance.OverrideBlocklist(content.Id);
 
+                plugin.Instance.Initialize();
+
                 if (plugin.Instance.Verify(ref container) is not EVerifyResult.Success)
                     pluginApplies = false;
 
                 if (pluginApplies) plugin.Instance.Patch(ref container, Settings.Options.DryRun);
                 // TODO: Provide escape hatch here
                 if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add(plugin.Name);
+                plugin.Instance.PostPatch();
             }
             catch (Exception e)
             {

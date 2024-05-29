@@ -28,4 +28,12 @@ public class BasePlugin : IPlugin
     {
         return EVerifyResult.Success;
     }
+
+    public void Initialize()
+    {
+    }
+
+    public void PostPatch()
+    {
+    }
 }
