@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using AdGoBye.Plugins;
+using AssetsTools.NET;
 using AssetsTools.NET.Extra;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -298,6 +299,9 @@ public class Indexer
         if (content.Type is not ContentType.World) return;
         Logger.Information("Processing {ID} ({directory})", content.Id, content.VersionMeta.Path);
 
+        var file = Path.Combine(content.VersionMeta.Path, "__data");
+        var container = new ContentFileContainer(file);
+
         var pluginOverridesBlocklist = false;
         foreach (var plugin in PluginLoader.LoadedPlugins)
         {
@@ -305,8 +309,8 @@ public class Indexer
             {
                 if (content.VersionMeta.PatchedBy.Contains(plugin.Name)) continue;
 
-                var pluginApplies = plugin.Instance.PluginType() == EPluginType.Global;
-                if (!pluginApplies && plugin.Instance.PluginType() == EPluginType.ContentSpecific)
+                var pluginApplies = plugin.Instance.PluginType() is EPluginType.Global;
+                if (!pluginApplies && plugin.Instance.PluginType() is EPluginType.ContentSpecific)
                 {
                     var ctIds = plugin.Instance.ResponsibleForContentIds();
                     if (ctIds is not null) pluginApplies = ctIds.Contains(content.Id);
@@ -314,10 +318,11 @@ public class Indexer
 
                 pluginOverridesBlocklist = plugin.Instance.OverrideBlocklist(content.Id);
 
-                if (plugin.Instance.Verify(content.Id, content.VersionMeta.Path) is not EVerifyResult.Success)
+                if (plugin.Instance.Verify(ref container) is not EVerifyResult.Success)
                     pluginApplies = false;
 
-                if (pluginApplies) plugin.Instance.Patch(content.Id, content.VersionMeta.Path);
+                if (pluginApplies) plugin.Instance.Patch(ref container, Settings.Options.DryRun);
+                // TODO: Provide escape hatch here
                 if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add(plugin.Name);
             }
             catch (Exception e)
@@ -328,7 +333,6 @@ public class Indexer
             }
         }
 
-        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract - False positive
         if (Blocklist.Blocks is null) return;
         if (pluginOverridesBlocklist) return;
         if (content.VersionMeta.PatchedBy.Contains("Blocklist")) return;
@@ -336,10 +340,9 @@ public class Indexer
         {
             try
             {
-                var unmatchedObjects = Blocklist.Patch(content.VersionMeta.Path + "/__data", block.Value.ToArray());
+                var unmatchedObjects = Blocklist.Patch(container, block.Value.ToArray());
                 if (Settings.Options.SendUnmatchedObjectsToDevs && unmatchedObjects is not null)
                     Blocklist.SendUnpatchedObjects(content, unmatchedObjects);
-                if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
             }
             catch (Exception e)
             {
@@ -347,6 +350,17 @@ public class Indexer
             }
         }
 
+        using var writer = new AssetsFileWriter(file + ".clean");
+        container.Bundle.file.Write(writer);
+        // Moving the file without closing our access fails on NT.
+        writer.Close();
+        container.Bundle.file.Close();
+        container.Bundle.file.Close();
+
+        // TODO: Provide option to disable backup file?
+        File.Replace(file + ".clean", file, file + ".bak");
+
+        if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
         Logger.Information("Processed {ID}", content.Id);
     }
 

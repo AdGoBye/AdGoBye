@@ -19,13 +19,13 @@ public class BasePlugin : IPlugin
         return false;
     }
 
-    public virtual EPatchResult Patch(string contentId, string dataDirectoryPath)
+    public EPatchResult Patch(ref ContentFileContainer fileContainer, bool dryRunRequested)
     {
         throw new NotImplementedException();
     }
 
-    public virtual EVerifyResult Verify(string contentId, string dataDirectoryPath)
+    public EVerifyResult Verify(ref readonly ContentFileContainer fileContainer)
     {
-        return EVerifyResult.Success;
+        throw new NotImplementedException();
     }
 }

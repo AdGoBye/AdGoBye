@@ -18,7 +18,6 @@ public interface IPlugin
     /// <summary>
     ///     A plugin can choose to override the default and user-specific blocklists
     ///     (in case the logic should be directly handled by the plugin).
-    ///     A user can override this on a per-plugin-per-world level.
     /// </summary>
     /// <param name="contentId">The id of the content that is to be evaluated</param>
     /// <returns>Whether the plugin will override the blocklist.</returns>
@@ -28,13 +27,17 @@ public interface IPlugin
     ///     Patch is the main entrypoint to a plugin's operations. Plugins are expected to carry out their respective
     ///     behaviours in this method.
     /// </summary>
-    /// <param name="contentId">A string representing the content's blueprint identifier</param>
-    /// <param name="dataDirectoryPath">The path of the cache directory that contains the __data file</param>
+    /// <param name="fileContainer">The underlying asset currently being operated on</param>
+    /// <param name="dryRunRequested">Bool representing if the current operation is a dry run, you should only simluate changes if this is true</param>
     /// <returns>A <see cref="EPatchResult" /> that signifies the result of the plugin's patch operation</returns>
-    EPatchResult Patch(string contentId, string dataDirectoryPath);
+    EPatchResult Patch(ref ContentFileContainer fileContainer, bool dryRunRequested);
 
-    /// <param name="contentId">A string representing the content's blueprint identifier</param>
-    /// <param name="dataDirectoryPath">The path of the cache directory that contains the __data file</param>
-    /// <returns>A <see cref="EVerifyResult" /> that signifies the result of the plugin's patch operation</returns>
-    EVerifyResult Verify(string contentId, string dataDirectoryPath);
+    /// <summary>
+    ///     Verify is a non-editable phase where you may run environment and validity checks on the asset before
+    ///     operating on it in <see cref="Patch"/>.
+    /// </summary>
+    /// <param name="fileContainer">The underlying asset currently being operated on</param>
+    /// <returns>A <see cref="EVerifyResult" /> that signifies the result of the plugin's verify operation.
+    ///          Non-<see cref="EVerifyResult.Success"/> returns will skip this Plugin from being executed. </returns>
+    EVerifyResult Verify(ref readonly ContentFileContainer fileContainer);
 }
