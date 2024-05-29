@@ -33,7 +33,7 @@ public class ExamplePlugin : BasePlugin
                 Logger.Verbose("Found chair on '{name}' [{PathID}], disabling", parentGameObjectInfo["m_Name"].AsString,
                     parentGameObject.PathId);
 
-                parentGameObjectInfo["m_IsActive"].AsBool = false;
+                if (!dryRunRequested) parentGameObjectInfo["m_IsActive"].AsBool = false;
                 parentGameObject.SetNewData(parentGameObjectInfo);
 
                 if (foundOneChair) continue;
