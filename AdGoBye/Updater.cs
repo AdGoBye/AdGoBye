@@ -18,7 +18,7 @@ public static class Updater
 
     public static void CheckUpdates()
     {
-        if (HasConnectivity())
+        if (!HasConnectivity())
         {
             Logger.Warning("We appear to be offline, skipping update check.");
             return;
