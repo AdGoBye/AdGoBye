@@ -3,6 +3,7 @@
 
 namespace AdGoBye.Plugins;
 
+[AttributeUsage(AttributeTargets.Assembly)]
 public class AgbPluginAttribute(string name, string maintainer, string version, Type instance)
     : Attribute
 {
