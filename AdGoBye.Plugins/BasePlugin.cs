@@ -26,6 +26,6 @@ public class BasePlugin : IPlugin
 
     public virtual EVerifyResult Verify(ref readonly ContentFileContainer fileContainer)
     {
-        throw new NotImplementedException();
+        return EVerifyResult.Success;
     }
 }
