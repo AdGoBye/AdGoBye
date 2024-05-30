@@ -45,11 +45,11 @@ if (Blocklist.Blocks == null || Blocklist.Blocks.Count == 0)
 logger.Information("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
     Blocklist.Blocks?.Count, db.Content.Count());
 
-foreach (var content in db.Content.Include(content => content.VersionMeta))
+Parallel.ForEach(db.Content.Include(content => content.VersionMeta), content =>
 {
-    if (content.Type != ContentType.World) continue;
+    if (content.Type != ContentType.World) return;
     Indexer.PatchContent(content);
-}
+});
 
 db.SaveChanges();
 
