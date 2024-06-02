@@ -27,16 +27,16 @@ public interface IPlugin
     ///     Patch is the main entrypoint to a plugin's operations. Plugins are expected to carry out their respective
     ///     behaviours in this method.
     /// </summary>
-    /// <param name="fileContainer">The underlying asset currently being operated on</param>
+    /// <param name="fileContainer">Container for the underlying asset being operated on</param>
     /// <param name="dryRunRequested">Bool representing if the current operation is a dry run, you should only simluate changes if this is true</param>
     /// <returns>A <see cref="EPatchResult" /> that signifies the result of the plugin's patch operation</returns>
     EPatchResult Patch(ref ContentFileContainer fileContainer, bool dryRunRequested);
 
     /// <summary>
-    ///     Verify is a non-editable phase where you may run environment and validity checks on the asset before
+    ///     Verify is a non-edit stage where Plugins can run environment and validity checks on the asset before
     ///     operating on it in <see cref="Patch"/>.
     /// </summary>
-    /// <param name="fileContainer">The underlying asset currently being operated on</param>
+    /// <param name="fileContainer">Container for the underlying asset being operated on</param>
     /// <returns>A <see cref="EVerifyResult" /> that signifies the result of the plugin's verify operation.
     ///          Non-<see cref="EVerifyResult.Success"/> returns will skip this Plugin from being executed. </returns>
     EVerifyResult Verify(ref readonly ContentFileContainer fileContainer);
