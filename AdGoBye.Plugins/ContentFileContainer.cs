@@ -13,6 +13,5 @@ public class ContentFileContainer
         Manager = new AssetsManager();
         Bundle = Manager.LoadBundleFile(contentPath);
         AssetsFile = Manager.LoadAssetsFileFromBundle(Bundle, 1);
-        ;
     }
 }
