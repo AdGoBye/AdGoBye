@@ -48,7 +48,7 @@ public interface IPlugin
     void Initialize();
 
     /// <summary>
-    /// Initialize is a function that Plugins can use to clean up after themselves after execution.
+    /// PostPatch is a function that Plugins can use to clean up after themselves after execution.
     /// </summary>
     void PostPatch();
 
