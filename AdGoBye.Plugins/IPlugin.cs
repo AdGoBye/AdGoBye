@@ -24,6 +24,17 @@ public interface IPlugin
     bool OverrideBlocklist(string contentId);
 
     /// <summary>
+    /// WantsIndexerTracking allows a Plugin to pick if it wants the Indexer to skip it when the Indexer thinks
+    /// the Plugin has already patched the file.
+    /// </summary>
+    /// <remarks>
+    /// When a Plugin patches a file, the Indexer keeps track of the Plugin that modified that version of the file,
+    /// which non-deterministic and exotically designed Plugins may not benifit from.
+    ///</remarks>
+    /// <returns>Boolean indicating if the Indexer should skip if thought already patched.</returns>
+    bool WantsIndexerTracking();
+
+    /// <summary>
     ///     Patch is the main entrypoint to a plugin's operations. Plugins are expected to carry out their respective
     ///     behaviours in this method.
     /// </summary>
@@ -42,8 +53,8 @@ public interface IPlugin
     EVerifyResult Verify(ref readonly ContentFileContainer fileContainer);
 
     /// <summary>
-    /// Initialize is a function that Plugins can use to set up their environment before executing
-    /// <see cref="Patch"/> and <see cref="Verify"/> functions.
+    /// Initialize is an optional function ran before <see cref="Verify"/> which Plugins may use to prepare their state
+    /// before patching a world. It's part of the patching loop and therefore may be called multiple times.
     /// </summary>
     void Initialize();
 
@@ -51,15 +62,4 @@ public interface IPlugin
     /// PostPatch is a function that Plugins can use to clean up after themselves after execution.
     /// </summary>
     void PostPatch();
-
-    /// <summary>
-    /// WantsIndexerTracking allows a Plugin to pick if it wants the Indexer to skip it when the Indexer thinks
-    /// the Plugin has already patched the file.
-    /// </summary>
-    /// <remarks>
-    /// When a Plugin patches a file, the Indexer keeps track of the Plugin that modified that version of the file,
-    /// which non-deterministic and exotically designed Plugins may not benifit from.
-    ///</remarks>
-    /// <returns>Boolean indicating if the Indexer should skip if thought already patched.</returns>
-    bool WantsIndexerTracking();
 }
