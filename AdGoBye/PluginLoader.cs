@@ -90,6 +90,7 @@ public static class PluginLoader
             if (!allowlist.Contains($"{pluginName} ({pluginMaintainer}, {pluginVersion})"))
             {
                 Logger.Information("""
+                                   ======================================================
                                    You are trying to run {Name} ({maintainer}, {version})
                                    Plugins can run arbitrary code therefore can do everything on your system that you can, this includes installing malware or stealing your accounts.
 
@@ -97,6 +98,7 @@ public static class PluginLoader
                                    The AdGoBye Team is not responsible for what Plugins do.
 
                                    Input 'y' to allow this plugin or input anything else to skip this plugin.
+                                   ======================================================
                                    """, pluginName, pluginMaintainer, pluginVersion);
                 var input = Console.ReadLine();
 
