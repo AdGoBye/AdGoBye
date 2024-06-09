@@ -59,7 +59,8 @@ public interface IPlugin
     void Initialize();
 
     /// <summary>
-    /// PostPatch is a function that Plugins can use to clean up after themselves after execution.
+    /// PostPatch is an optional function ran after <see cref="Patch"/> in the patch loop which Plugins may use to clean
+    /// their state after patching a world. It's part of the patching loop and therefore may be called multiple times.
     /// </summary>
     void PostPatch();
 }
