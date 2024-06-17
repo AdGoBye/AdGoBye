@@ -1,6 +1,4 @@
 using System.Collections.Concurrent;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -11,32 +9,6 @@ using Microsoft.EntityFrameworkCore;
 using Serilog;
 
 namespace AdGoBye;
-
-public enum ContentType
-{
-    Avatar,
-    World
-}
-
-public record Content
-{
-    public required string Id { get; init; }
-    public required ContentType Type { get; init; }
-    public required ContentVersionMeta VersionMeta { get; set; }
-    public required string StableContentName { get; init; }
-
-
-    public record ContentVersionMeta
-    {
-        [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int Id { get; set; }
-
-        public required int Version { get; set; }
-        public required string Path { get; set; }
-        public required List<string> PatchedBy { get; set; }
-    }
-}
 
 public class Indexer
 {
@@ -300,7 +272,7 @@ public class Indexer
         Logger.Information("Processing {ID} ({directory})", content.Id, content.VersionMeta.Path);
 
         var file = Path.Combine(content.VersionMeta.Path, "__data");
-        var container = new ContentFileContainer(file);
+        var container = new ContentAssetManagerContainer(file);
 
         var pluginOverridesBlocklist = false;
         foreach (var plugin in PluginLoader.LoadedPlugins)
@@ -317,19 +289,19 @@ public class Indexer
                     if (ctIds is not null) pluginApplies = ctIds.Contains(content.Id);
                 }
 
-                pluginOverridesBlocklist = plugin.Instance.OverrideBlocklist(content.Id);
+                pluginOverridesBlocklist = plugin.Instance.OverrideBlocklist(content);
 
-                plugin.Instance.Initialize();
+                plugin.Instance.Initialize(content);
 
-                if (plugin.Instance.Verify(ref container) is not EVerifyResult.Success)
+                if (plugin.Instance.Verify(content, ref container) is not EVerifyResult.Success)
                     pluginApplies = false;
 
-                if (pluginApplies) plugin.Instance.Patch(ref container, Settings.Options.DryRun);
+                if (pluginApplies) plugin.Instance.Patch(content, ref container, Settings.Options.DryRun);
 
                 if (!Settings.Options.DryRun && plugin.Instance.WantsIndexerTracking())
                     content.VersionMeta.PatchedBy.Add(plugin.Name);
 
-                plugin.Instance.PostPatch();
+                plugin.Instance.PostPatch(content);
             }
             catch (Exception e)
             {

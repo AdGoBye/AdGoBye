@@ -7,7 +7,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using AdGoBye.Plugins;
 using AssetsTools.NET;
 using AssetsTools.NET.Extra;
 using Serilog;
@@ -210,30 +209,30 @@ public static class Blocklist
     }
 
 
-    public static List<GameObjectInstance>? Patch(ContentFileContainer contentFileContainer,
+    public static List<GameObjectInstance>? Patch(ContentAssetManagerContainer assetContainer,
         GameObjectInstance[] gameObjectsToDisable)
     {
         var patchedGameObjects = new List<GameObjectInstance>();
 
-        foreach (var gameObject in contentFileContainer.AssetsFile.file.GetAssetsOfType(AssetClassID.GameObject))
+        foreach (var gameObject in assetContainer.AssetsFile.file.GetAssetsOfType(AssetClassID.GameObject))
         {
             foreach (var blocklistGameObject in gameObjectsToDisable)
             {
                 var baseGameObject =
-                    contentFileContainer.Manager.GetBaseField(contentFileContainer.AssetsFile, gameObject);
+                    assetContainer.Manager.GetBaseField(assetContainer.AssetsFile, gameObject);
                 if (baseGameObject["m_Name"].AsString != blocklistGameObject.Name) continue;
                 if (!baseGameObject["m_IsActive"].AsBool) continue;
 
                 if (blocklistGameObject.Parent is not null || blocklistGameObject.Position is not null)
                 {
-                    if (!ProcessPositionAndParent(blocklistGameObject, baseGameObject, contentFileContainer.AssetsFile))
+                    if (!ProcessPositionAndParent(blocklistGameObject, baseGameObject, assetContainer.AssetsFile))
                         continue;
                 }
 
                 baseGameObject["m_IsActive"].AsBool = false;
                 gameObject.SetNewData(baseGameObject);
-                contentFileContainer.Bundle.file.BlockAndDirInfo.DirectoryInfos[1]
-                    .SetNewData(contentFileContainer.AssetsFile.file);
+                assetContainer.Bundle.file.BlockAndDirInfo.DirectoryInfos[1]
+                    .SetNewData(assetContainer.AssetsFile.file);
                 patchedGameObjects.Add(blocklistGameObject);
                 Logger.Debug("Found and disabled {gameObjectName}", blocklistGameObject.Name);
             }
@@ -255,7 +254,7 @@ public static class Blocklist
             GameObjectInstance blocklistGameObject)
         {
             var fatherGameObject =
-                contentFileContainer.Manager.GetExtAsset(assetsFileInstance, FatherPos.baseField["m_GameObject"]);
+                assetContainer.Manager.GetExtAsset(assetsFileInstance, FatherPos.baseField["m_GameObject"]);
 
             if (blocklistGameObject.Parent!.Position is not null)
             {
@@ -271,7 +270,7 @@ public static class Blocklist
         {
             foreach (var data in baseGameObject["m_Component.Array"])
             {
-                var componentInstance = contentFileContainer.Manager.GetExtAsset(assetfileinstance, data["component"]);
+                var componentInstance = assetContainer.Manager.GetExtAsset(assetfileinstance, data["component"]);
                 if ((AssetClassID)componentInstance.info.TypeId is not AssetClassID.RectTransform
                     and not AssetClassID.Transform)
                     continue;
@@ -285,7 +284,7 @@ public static class Blocklist
                 if (blocklistGameObject.Parent is not null)
                 {
                     var fatherGameObject =
-                        contentFileContainer.Manager.GetExtAsset(assetfileinstance,
+                        assetContainer.Manager.GetExtAsset(assetfileinstance,
                             componentInstance.baseField["m_Father"]);
                     if (!DoesParentMatch(fatherGameObject, assetfileinstance, blocklistGameObject)) return false;
                 }

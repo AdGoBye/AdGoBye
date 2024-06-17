@@ -1,3 +1,4 @@
+global using AdGoBye.Types;
 using AdGoBye;
 using AdGoBye.Plugins;
 using Microsoft.EntityFrameworkCore;

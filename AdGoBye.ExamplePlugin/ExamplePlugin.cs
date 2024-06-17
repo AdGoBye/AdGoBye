@@ -1,4 +1,5 @@
 ﻿using AdGoBye.Plugins;
+using AdGoBye.Types;
 using AssetsTools.NET.Extra;
 using Serilog;
 
@@ -13,7 +14,7 @@ public class ExamplePlugin : BasePlugin
         return EPluginType.Global;
     }
 
-    public override EPatchResult Patch(ref ContentFileContainer fileContainer, bool dryRunRequested)
+    public override EPatchResult Patch(Content _, ref ContentAssetManagerContainer fileContainer, bool dryRunRequested)
     {
         try
         {

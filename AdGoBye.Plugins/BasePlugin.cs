@@ -1,4 +1,6 @@
-﻿namespace AdGoBye.Plugins;
+﻿using AdGoBye.Types;
+
+namespace AdGoBye.Plugins;
 
 public class BasePlugin : IPlugin
 {
@@ -14,26 +16,27 @@ public class BasePlugin : IPlugin
         throw new NotImplementedException();
     }
 
-    public virtual bool OverrideBlocklist(string contentId)
+    public virtual bool OverrideBlocklist(Content context)
     {
         return false;
     }
 
-    public virtual EPatchResult Patch(ref ContentFileContainer fileContainer, bool dryRunRequested)
+    public virtual EPatchResult Patch(Content context, ref ContentAssetManagerContainer assetContainer,
+        bool dryRunRequested)
     {
         throw new NotImplementedException();
     }
 
-    public virtual EVerifyResult Verify(ref readonly ContentFileContainer fileContainer)
+    public virtual EVerifyResult Verify(Content context, ref readonly ContentAssetManagerContainer assetContainer)
     {
         return EVerifyResult.Success;
     }
 
-    public void Initialize()
+    public void Initialize(Content context)
     {
     }
 
-    public void PostPatch()
+    public void PostPatch(Content context)
     {
     }
 
