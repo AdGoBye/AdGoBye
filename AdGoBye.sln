@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdGoBye.Plugins", "AdGoBye.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdGoBye.ExamplePlugin", "AdGoBye.ExamplePlugin\AdGoBye.ExamplePlugin.csproj", "{128897F0-3814-4756-B95E-564FF0EEF5C2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdGoBye.Types", "AdGoBye.Types\AdGoBye.Types.csproj", "{3CBD3F1B-DEA9-44CC-96C3-8F63F81C281A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{128897F0-3814-4756-B95E-564FF0EEF5C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{128897F0-3814-4756-B95E-564FF0EEF5C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{128897F0-3814-4756-B95E-564FF0EEF5C2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3CBD3F1B-DEA9-44CC-96C3-8F63F81C281A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3CBD3F1B-DEA9-44CC-96C3-8F63F81C281A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3CBD3F1B-DEA9-44CC-96C3-8F63F81C281A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3CBD3F1B-DEA9-44CC-96C3-8F63F81C281A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

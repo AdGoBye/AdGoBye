@@ -1,41 +1,14 @@
 using System.Collections.Concurrent;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using AdGoBye.Plugins;
+using AssetsTools.NET;
 using AssetsTools.NET.Extra;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
 namespace AdGoBye;
-
-public enum ContentType
-{
-    Avatar,
-    World
-}
-
-public record Content
-{
-    public required string Id { get; init; }
-    public required ContentType Type { get; init; }
-    public required ContentVersionMeta VersionMeta { get; set; }
-    public required string StableContentName { get; init; }
-
-
-    public record ContentVersionMeta
-    {
-        [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int Id { get; set; }
-
-        public required int Version { get; set; }
-        public required string Path { get; set; }
-        public required List<string> PatchedBy { get; set; }
-    }
-}
 
 public class Indexer
 {
@@ -298,27 +271,37 @@ public class Indexer
         if (content.Type is not ContentType.World) return;
         Logger.Information("Processing {ID} ({directory})", content.Id, content.VersionMeta.Path);
 
+        var file = Path.Combine(content.VersionMeta.Path, "__data");
+        var container = new ContentAssetManagerContainer(file);
+
         var pluginOverridesBlocklist = false;
         foreach (var plugin in PluginLoader.LoadedPlugins)
         {
             try
             {
-                if (content.VersionMeta.PatchedBy.Contains(plugin.Name)) continue;
+                if (plugin.Instance.WantsIndexerTracking() &&
+                    content.VersionMeta.PatchedBy.Contains(plugin.Name)) continue;
 
-                var pluginApplies = plugin.Instance.PluginType() == EPluginType.Global;
-                if (!pluginApplies && plugin.Instance.PluginType() == EPluginType.ContentSpecific)
+                var pluginApplies = plugin.Instance.PluginType() is EPluginType.Global;
+                if (!pluginApplies && plugin.Instance.PluginType() is EPluginType.ContentSpecific)
                 {
                     var ctIds = plugin.Instance.ResponsibleForContentIds();
                     if (ctIds is not null) pluginApplies = ctIds.Contains(content.Id);
                 }
 
-                pluginOverridesBlocklist = plugin.Instance.OverrideBlocklist(content.Id);
+                pluginOverridesBlocklist = plugin.Instance.OverrideBlocklist(content);
 
-                if (plugin.Instance.Verify(content.Id, content.VersionMeta.Path) is not EVerifyResult.Success)
+                plugin.Instance.Initialize(content);
+
+                if (plugin.Instance.Verify(content, ref container) is not EVerifyResult.Success)
                     pluginApplies = false;
 
-                if (pluginApplies) plugin.Instance.Patch(content.Id, content.VersionMeta.Path);
-                if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add(plugin.Name);
+                if (pluginApplies) plugin.Instance.Patch(content, ref container, Settings.Options.DryRun);
+
+                if (!Settings.Options.DryRun && plugin.Instance.WantsIndexerTracking())
+                    content.VersionMeta.PatchedBy.Add(plugin.Name);
+
+                plugin.Instance.PostPatch(content);
             }
             catch (Exception e)
             {
@@ -328,7 +311,6 @@ public class Indexer
             }
         }
 
-        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract - False positive
         if (Blocklist.Blocks is null) return;
         if (pluginOverridesBlocklist) return;
         if (content.VersionMeta.PatchedBy.Contains("Blocklist")) return;
@@ -336,10 +318,9 @@ public class Indexer
         {
             try
             {
-                var unmatchedObjects = Blocklist.Patch(content.VersionMeta.Path + "/__data", block.Value.ToArray());
+                var unmatchedObjects = Blocklist.Patch(container, block.Value.ToArray());
                 if (Settings.Options.SendUnmatchedObjectsToDevs && unmatchedObjects is not null)
                     Blocklist.SendUnpatchedObjects(content, unmatchedObjects);
-                if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
             }
             catch (Exception e)
             {
@@ -347,6 +328,18 @@ public class Indexer
             }
         }
 
+        container.Bundle.file.BlockAndDirInfo.DirectoryInfos[1].SetNewData(container.AssetsFile.file);
+        using var writer = new AssetsFileWriter(file + ".clean");
+        container.Bundle.file.Write(writer);
+        // Moving the file without closing our access fails on NT.
+        writer.Close();
+        container.Bundle.file.Close();
+        container.Bundle.file.Close();
+
+        // TODO: Provide option to disable backup file?
+        File.Replace(file + ".clean", file, file + ".bak");
+
+        if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
         Logger.Information("Processed {ID}", content.Id);
     }
 

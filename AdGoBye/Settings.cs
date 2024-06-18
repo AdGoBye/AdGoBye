@@ -27,5 +27,6 @@ public static class Settings
         public bool EnableLive { get; set; }
         public bool DryRun { get; set; }
         public string[] BlocklistUrLs { get; set; } = [];
+        public bool DisablePluginInstallWarning { get; set; }
     }
 }

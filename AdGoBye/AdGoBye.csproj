@@ -48,5 +48,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\AdGoBye.Plugins\AdGoBye.Plugins.csproj" />
+        <ProjectReference Include="..\AdGoBye.Types\AdGoBye.Types.csproj"/>
     </ItemGroup>
 </Project>

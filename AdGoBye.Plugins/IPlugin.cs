@@ -2,6 +2,8 @@
 // ReSharper disable UnusedParameter.Global
 // ReSharper disable UnusedMethodReturnValue.Global
 
+using AdGoBye.Types;
+
 namespace AdGoBye.Plugins;
 
 public interface IPlugin
@@ -18,23 +20,53 @@ public interface IPlugin
     /// <summary>
     ///     A plugin can choose to override the default and user-specific blocklists
     ///     (in case the logic should be directly handled by the plugin).
-    ///     A user can override this on a per-plugin-per-world level.
     /// </summary>
-    /// <param name="contentId">The id of the content that is to be evaluated</param>
     /// <returns>Whether the plugin will override the blocklist.</returns>
-    bool OverrideBlocklist(string contentId);
+    /// <param name="context">The asset about to be operated on</param>
+    bool OverrideBlocklist(Content context);
+
+    /// <summary>
+    /// WantsIndexerTracking allows a Plugin to pick if it wants the Indexer to skip it when the Indexer thinks
+    /// the Plugin has already patched the file.
+    /// </summary>
+    /// <remarks>
+    /// When a Plugin patches a file, the Indexer keeps track of the Plugin that modified that version of the file,
+    /// which non-deterministic and exotically designed Plugins may not benifit from.
+    ///</remarks>
+    /// <returns>Boolean indicating if the Indexer should skip if thought already patched.</returns>
+    bool WantsIndexerTracking();
 
     /// <summary>
     ///     Patch is the main entrypoint to a plugin's operations. Plugins are expected to carry out their respective
     ///     behaviours in this method.
     /// </summary>
-    /// <param name="contentId">A string representing the content's blueprint identifier</param>
-    /// <param name="dataDirectoryPath">The path of the cache directory that contains the __data file</param>
+    /// <param name="context">The asset about to be operated on</param>
+    /// <param name="assetContainer">Container for the underlying asset being operated on</param>
+    /// <param name="dryRunRequested">Bool representing if the current operation is a dry run, you should only simluate changes if this is true</param>
     /// <returns>A <see cref="EPatchResult" /> that signifies the result of the plugin's patch operation</returns>
-    EPatchResult Patch(string contentId, string dataDirectoryPath);
+    EPatchResult Patch(Content context, ref ContentAssetManagerContainer assetContainer, bool dryRunRequested);
 
-    /// <param name="contentId">A string representing the content's blueprint identifier</param>
-    /// <param name="dataDirectoryPath">The path of the cache directory that contains the __data file</param>
-    /// <returns>A <see cref="EVerifyResult" /> that signifies the result of the plugin's patch operation</returns>
-    EVerifyResult Verify(string contentId, string dataDirectoryPath);
+    /// <summary>
+    ///     Verify is a non-edit stage where Plugins can run environment and validity checks on the asset before
+    ///     operating on it in <see cref="Patch"/>.
+    /// </summary>
+    /// <param name="context">The asset about to be operated on</param>
+    /// <param name="assetContainer">Container for the underlying asset being operated on</param>
+    /// <returns>A <see cref="EVerifyResult" /> that signifies the result of the plugin's verify operation.
+    /// Non-<see cref="EVerifyResult.Success"/> returns will skip this Plugin from being executed.</returns>
+    EVerifyResult Verify(Content context, ref readonly ContentAssetManagerContainer assetContainer);
+
+    /// <summary>
+    /// Initialize is an optional function ran before <see cref="Verify"/> which Plugins may use to prepare their state
+    /// before patching a world. It's part of the patching loop and therefore may be called multiple times.
+    /// </summary>
+    /// <param name="context">The asset about to be operated on</param>
+    void Initialize(Content context);
+
+    /// <summary>
+    /// PostPatch is an optional function ran after <see cref="Patch"/> in the patch loop which Plugins may use to clean
+    /// their state after patching a world. It's part of the patching loop and therefore may be called multiple times.
+    /// </summary>
+    /// <param name="context">The asset that has been operated on</param>
+    void PostPatch(Content context);
 }
