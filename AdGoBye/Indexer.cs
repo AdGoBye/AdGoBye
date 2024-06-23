@@ -311,20 +311,21 @@ public class Indexer
             }
         }
 
-        if (Blocklist.Blocks is null) return;
-        if (pluginOverridesBlocklist) return;
-        if (content.VersionMeta.PatchedBy.Contains("Blocklist")) return;
-        foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
+        if (Blocklist.Blocks is not null && !pluginOverridesBlocklist &&
+            !content.VersionMeta.PatchedBy.Contains("Blocklist"))
         {
-            try
+            foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
             {
-                var unmatchedObjects = Blocklist.Patch(container, block.Value.ToArray());
-                if (Settings.Options.SendUnmatchedObjectsToDevs && unmatchedObjects is not null)
-                    Blocklist.SendUnpatchedObjects(content, unmatchedObjects);
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to patch {ID} ({path})", content.Id, content.VersionMeta.Path);
+                try
+                {
+                    var unmatchedObjects = Blocklist.Patch(container, block.Value.ToArray());
+                    if (Settings.Options.SendUnmatchedObjectsToDevs && unmatchedObjects is not null)
+                        Blocklist.SendUnpatchedObjects(content, unmatchedObjects);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to patch {ID} ({path})", content.Id, content.VersionMeta.Path);
+                }
             }
         }
 
