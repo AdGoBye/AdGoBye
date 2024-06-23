@@ -21,8 +21,7 @@ public class BasePlugin : IPlugin
         return false;
     }
 
-    public virtual EPatchResult Patch(Content context, ref ContentAssetManagerContainer assetContainer,
-        bool dryRunRequested)
+    public virtual EPatchResult Patch(Content context, ref ContentAssetManagerContainer assetContainer)
     {
         throw new NotImplementedException();
     }

@@ -296,7 +296,7 @@ public class Indexer
                 if (plugin.Instance.Verify(content, ref container) is not EVerifyResult.Success)
                     pluginApplies = false;
 
-                if (pluginApplies) plugin.Instance.Patch(content, ref container, Settings.Options.DryRun);
+                if (pluginApplies) plugin.Instance.Patch(content, ref container);
 
                 if (!Settings.Options.DryRun && plugin.Instance.WantsIndexerTracking())
                     content.VersionMeta.PatchedBy.Add(plugin.Name);

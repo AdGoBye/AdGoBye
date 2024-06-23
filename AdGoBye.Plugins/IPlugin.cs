@@ -42,9 +42,8 @@ public interface IPlugin
     /// </summary>
     /// <param name="context">The asset about to be operated on</param>
     /// <param name="assetContainer">Container for the underlying asset being operated on</param>
-    /// <param name="dryRunRequested">Bool representing if the current operation is a dry run, you should only simluate changes if this is true</param>
     /// <returns>A <see cref="EPatchResult" /> that signifies the result of the plugin's patch operation</returns>
-    EPatchResult Patch(Content context, ref ContentAssetManagerContainer assetContainer, bool dryRunRequested);
+    EPatchResult Patch(Content context, ref ContentAssetManagerContainer assetContainer);
 
     /// <summary>
     ///     Verify is a non-edit stage where Plugins can run environment and validity checks on the asset before

@@ -14,7 +14,7 @@ public class ExamplePlugin : BasePlugin
         return EPluginType.Global;
     }
 
-    public override EPatchResult Patch(Content _, ref ContentAssetManagerContainer fileContainer, bool dryRunRequested)
+    public override EPatchResult Patch(Content _, ref ContentAssetManagerContainer fileContainer)
     {
         try
         {
@@ -34,7 +34,7 @@ public class ExamplePlugin : BasePlugin
                 Logger.Verbose("Found chair on '{name}' [{PathID}], disabling", parentGameObjectInfo["m_Name"].AsString,
                     parentGameObject.PathId);
 
-                if (!dryRunRequested) parentGameObjectInfo["m_IsActive"].AsBool = false;
+                parentGameObjectInfo["m_IsActive"].AsBool = false;
                 parentGameObject.SetNewData(parentGameObjectInfo);
 
                 if (foundOneChair) continue;
