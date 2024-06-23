@@ -294,9 +294,10 @@ public static class Blocklist
             return true;
         }
 
+        [SuppressMessage("ReSharper", "CompareOfFloatsByEqualityOperator")] //  imprecision should equal out
         bool DoesPositionMatch(GameObjectPosition reference, AssetTypeValueField m_LocalPosition)
         {
-            // m_LocalPosition's origin is float but TOML Parser dies when reference type is float so we need to cast it here
+            // m_LocalPosition's origin is float but TOML Parser dies when reference type is float, so we need to cast it here
             return (float)reference.X == m_LocalPosition["x"].AsFloat
                    && (float)reference.Y == m_LocalPosition["y"].AsFloat
                    && (float)reference.Z == m_LocalPosition["z"].AsFloat;
