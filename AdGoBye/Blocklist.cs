@@ -221,7 +221,11 @@ public static class Blocklist
                 var baseGameObject =
                     assetContainer.Manager.GetBaseField(assetContainer.AssetsFile, gameObject);
                 if (baseGameObject["m_Name"].AsString != blocklistGameObject.Name) continue;
-                if (!baseGameObject["m_IsActive"].AsBool) continue;
+                if (!baseGameObject["m_IsActive"].AsBool)
+                {
+                    patchedGameObjects.Add(blocklistGameObject);
+                    continue;
+                }
 
                 if (blocklistGameObject.Parent is not null || blocklistGameObject.Position is not null)
                 {
