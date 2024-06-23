@@ -279,7 +279,7 @@ public static class Blocklist
                 if (blocklistGameObject.Position is not null)
                 {
                     if (!DoesPositionMatch(blocklistGameObject.Position,
-                            componentInstance.baseField["m_LocalPosition"])) continue;
+                            componentInstance.baseField["m_LocalPosition"])) return false;
                 }
 
                 if (blocklistGameObject.Parent is not null)
