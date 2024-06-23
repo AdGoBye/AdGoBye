@@ -248,11 +248,8 @@ public static class Blocklist
                 "Following blocklist objects weren't disabled: {@UnpatchedList}" +
                 "\nThis can mean that these blocklist entries are outdated, consider informing the maintainer",
                 unpatchedObjects);
-        if (Settings.Options.DryRun) return unpatchedObjects.Count != 0 ? unpatchedObjects : null;
-        Logger.Information("Done, writing changes as bundle");
 
         return unpatchedObjects.Count != 0 ? unpatchedObjects : null;
-
 
         bool DoesParentMatch(AssetExternal FatherPos, AssetsFileInstance assetsFileInstance,
             GameObjectInstance blocklistGameObject)
