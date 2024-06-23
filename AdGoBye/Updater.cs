@@ -29,7 +29,7 @@ public static class Updater
         var remoteVersionSemVer = SemVersion.Parse(remoteVersion.tag_name.Replace("v", ""));
         var localVersionSemVer = SemVersion.Parse(GetSelfVersion());
         Logger.Debug("Remote: {remote}, Local: {local} ", remoteVersion.tag_name, localVersionSemVer);
-        if (!localVersionSemVer.IsPrerelease && localVersionSemVer.ComparePrecedenceTo(remoteVersionSemVer) <= 0)
+        if (!localVersionSemVer.IsPrerelease && remoteVersionSemVer.ComparePrecedenceTo(localVersionSemVer) > 0)
         {
             Logger.Information(
                 "New version {remoteVersion} is out, you are using {localVersion}, download the new version at {url}",
