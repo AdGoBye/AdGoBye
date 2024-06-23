@@ -297,20 +297,9 @@ public static class Blocklist
         bool DoesPositionMatch(GameObjectPosition reference, AssetTypeValueField m_LocalPosition)
         {
             // m_LocalPosition's origin is float but TOML Parser dies when reference type is float so we need to cast it here
-            switch (m_LocalPosition.FieldName)
-            {
-                case "x":
-                    if ((float)reference.X != m_LocalPosition.AsFloat) return false;
-                    break;
-                case "y":
-                    if ((float)reference.Y != m_LocalPosition.AsFloat) return false;
-                    break;
-                case "z":
-                    if ((float)reference.Z != m_LocalPosition.AsFloat) return false;
-                    break;
-            }
-
-            return true;
+            return (float)reference.X == m_LocalPosition["x"].AsFloat
+                   && (float)reference.Y == m_LocalPosition["y"].AsFloat
+                   && (float)reference.Z == m_LocalPosition["z"].AsFloat;
         }
     }
 
