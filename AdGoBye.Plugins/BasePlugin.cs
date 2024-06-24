@@ -31,15 +31,15 @@ public class BasePlugin : IPlugin
         return EVerifyResult.Success;
     }
 
-    public void Initialize(Content context)
+    public virtual void Initialize(Content context)
     {
     }
 
-    public void PostPatch(Content context)
+    public virtual void PostPatch(Content context)
     {
     }
 
-    public bool WantsIndexerTracking()
+    public virtual bool WantsIndexerTracking()
     {
         return true;
     }
