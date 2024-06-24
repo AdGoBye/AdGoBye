@@ -339,7 +339,7 @@ public class Indexer
         // Moving the file without closing our access fails on NT.
         writer.Close();
         container.Bundle.file.Close();
-        container.Bundle.file.Close();
+        container.AssetsFile.file.Close();
 
         File.Replace(file + ".clean", file, Settings.Options.DisableBackupFile ? null : file + ".bak");
 
