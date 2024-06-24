@@ -341,8 +341,7 @@ public class Indexer
         container.Bundle.file.Close();
         container.Bundle.file.Close();
 
-        // TODO: Provide option to disable backup file?
-        File.Replace(file + ".clean", file, file + ".bak");
+        File.Replace(file + ".clean", file, Settings.Options.DisableBackupFile ? null : file + ".bak");
 
         if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
         Logger.Information("Processed {ID}", content.Id);
