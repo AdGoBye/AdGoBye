@@ -274,6 +274,14 @@ public class Indexer
         var file = Path.Combine(content.VersionMeta.Path, "__data");
         var container = new ContentAssetManagerContainer(file);
 
+        var estimatedUncompressedSize = EstimateDecompressedSize(container.Bundle.file);
+
+        if(estimatedUncompressedSize > (Settings.Options.ZipBombSizeLimitMB * 1000L * 1000L))
+        {
+            Logger.Warning("Skipped {ID} ({directory}) because it's likely a ZIP Bomb ({estimatedMB}MB uncompressed).", content.Id, content.VersionMeta.Path, (estimatedUncompressedSize / 1000 / 1000));
+            return;
+        }
+
         var pluginOverridesBlocklist = false;
         foreach (var plugin in PluginLoader.LoadedPlugins)
         {
@@ -338,21 +346,37 @@ public class Indexer
 
         if (Settings.Options.EnableRecompression)
         {
-            using var uncompressedMs = new MemoryStream();
-            using var uncompressedWriter = new AssetsFileWriter(uncompressedMs);
+            if (estimatedUncompressedSize > (Settings.Options.RecompressionMemoryMaxMB * 1000L * 1000L) 
+                || estimatedUncompressedSize >= 1_900_000_000) // 1.9GB hard limit to leave a 100MB buffer just in case the estimation is off.
+            {
+                var tempFileName = file + ".uncompressed";
+                using var uncompressedFs = File.Open(tempFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                CompressAndWrite(uncompressedFs);
+                File.Delete(tempFileName);
+            }
+            else
+            {
+                using var uncompressedMs = new MemoryStream();
+                CompressAndWrite(uncompressedMs);
+            }
 
-            container.Bundle.file.Write(uncompressedWriter);
+            void CompressAndWrite(Stream stream)
+            {
+                var newUncompressedBundle = new AssetBundleFile();
+                using var uncompressedWriter = new AssetsFileWriter(stream);
 
-            var newUncompressedBundle = new AssetBundleFile();
-            using var uncompressedReader = new AssetsFileReader(uncompressedMs);
-            newUncompressedBundle.Read(uncompressedReader);
+                container.Bundle.file.Write(uncompressedWriter);
 
-            newUncompressedBundle.Pack(writer, AssetBundleCompressionType.LZ4);
+                using var uncompressedReader = new AssetsFileReader(stream);
+                newUncompressedBundle.Read(uncompressedReader);
 
-            newUncompressedBundle.Close();
-            uncompressedWriter.Close();
-            uncompressedMs.Close();
-            uncompressedReader.Close();
+                newUncompressedBundle.Pack(writer, AssetBundleCompressionType.LZ4);
+
+                newUncompressedBundle.Close();
+                uncompressedWriter.Close();
+                uncompressedReader.Close();
+                stream.Close();
+            }
         }
         else
         {
@@ -368,6 +392,11 @@ public class Indexer
 
         if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
         Logger.Information("Processed {ID}", content.Id);
+    }
+
+    private static long EstimateDecompressedSize(AssetBundleFile assetBundleFile)
+    {
+        return assetBundleFile.BlockAndDirInfo.DirectoryInfos.Sum(x => x.DecompressedSize);
     }
 
     private static (DirectoryInfo? HighestVersionDirectory, int HighestVersion) GetLatestFileVersion(
