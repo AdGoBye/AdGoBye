@@ -52,7 +52,7 @@ Parallel.ForEach(db.Content.Include(content => content.VersionMeta), content =>
     Indexer.PatchContent(content);
 });
 
-db.SaveChanges();
+db.SaveChangesSafe();
 
 #pragma warning disable CS4014
 if (Settings.Options.EnableLive)
