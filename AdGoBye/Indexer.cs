@@ -85,10 +85,13 @@ public class Indexer
 
     public static void AddToIndex(string path)
     {
+        using var db = new State.IndexContext();
         if (AddToIndexPart1(path, out var content) && content != null)
         {
-            AddToIndexPart2(content);
+            AddToIndexPart2(content, db);
         }
+
+        db.SaveChanges();
     }
 
     public static void AddToIndex(IEnumerable<DirectoryInfo?> paths)
@@ -103,14 +106,18 @@ public class Indexer
         });
 
         var groupedById = contents.GroupBy(content => content.Id);
-
-        Parallel.ForEach(groupedById, group =>
+        using var writeDbContext = new State.IndexContext();
+        foreach (var group in groupedById)
         {
-            foreach (var content in group)
             {
-                AddToIndexPart2(content);
+                foreach (var content in group)
+                {
+                    AddToIndexPart2(content, writeDbContext);
+                }
             }
-        });
+        }
+
+        writeDbContext.SaveChanges();
     }
 
     public static bool AddToIndexPart1(string path, out Content? content)
@@ -151,12 +158,10 @@ public class Indexer
         return true;
     }
 
-    private static void AddToIndexPart2(Content content)
+    private static void AddToIndexPart2(Content content, State.IndexContext db)
     {
-        using var db = new State.IndexContext();
         var indexCopy = db.Content.Include(existingFile => existingFile.VersionMeta)
             .FirstOrDefault(existingFile => existingFile.Id == content.Id);
-
         if (indexCopy is null)
         {
             if (content.Type is ContentType.Avatar && IsAvatarImposter(content.VersionMeta.Path))
@@ -167,7 +172,6 @@ public class Indexer
 
             db.Content.Add(content);
             Logger.Information("Added {id} [{type}] to Index", content.Id, content.Type);
-            db.SaveChanges();
             return;
         }
 
@@ -182,7 +186,6 @@ public class Indexer
                 indexCopy.VersionMeta.Version = content.VersionMeta.Version;
                 indexCopy.VersionMeta.Path = content.VersionMeta.Path;
                 indexCopy.VersionMeta.PatchedBy = [];
-                db.SaveChanges();
                 return;
             // The second is an Imposter avatar, which we don't want to index.
             case ContentType.Avatar:
