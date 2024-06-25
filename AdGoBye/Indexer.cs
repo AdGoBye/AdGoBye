@@ -335,7 +335,30 @@ public class Indexer
 
         container.Bundle.file.BlockAndDirInfo.DirectoryInfos[1].SetNewData(container.AssetsFile.file);
         using var writer = new AssetsFileWriter(file + ".clean");
-        container.Bundle.file.Write(writer);
+
+        if (Settings.Options.EnableRecompression)
+        {
+            using var uncompressedMs = new MemoryStream();
+            using var uncompressedWriter = new AssetsFileWriter(uncompressedMs);
+
+            container.Bundle.file.Write(uncompressedWriter);
+
+            var newUncompressedBundle = new AssetBundleFile();
+            using var uncompressedReader = new AssetsFileReader(uncompressedMs);
+            newUncompressedBundle.Read(uncompressedReader);
+
+            newUncompressedBundle.Pack(writer, AssetBundleCompressionType.LZ4);
+
+            newUncompressedBundle.Close();
+            uncompressedWriter.Close();
+            uncompressedMs.Close();
+            uncompressedReader.Close();
+        }
+        else
+        {
+            container.Bundle.file.Write(writer);
+        }
+
         // Moving the file without closing our access fails on NT.
         writer.Close();
         container.Bundle.file.Close();

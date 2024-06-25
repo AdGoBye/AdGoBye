@@ -29,5 +29,6 @@ public static class Settings
         public string[] BlocklistUrLs { get; set; } = [];
         public bool DisablePluginInstallWarning { get; set; }
         public bool DisableBackupFile { get; set; }
+        public bool EnableRecompression { get; set; }
     }
 }
