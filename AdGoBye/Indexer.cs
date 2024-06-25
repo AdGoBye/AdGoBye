@@ -80,7 +80,7 @@ public class Indexer
             content.VersionMeta.PatchedBy = [];
         }
 
-        db.SaveChangesSafe();
+        db.SaveChanges();
     }
 
     public static void AddToIndex(string path)
@@ -142,7 +142,7 @@ public class Indexer
             content.VersionMeta.Path = directory.FullName;
             content.VersionMeta.PatchedBy = [];
 
-            db.SaveChangesSafe();
+            db.SaveChanges();
             return false;
         }
 
@@ -167,7 +167,7 @@ public class Indexer
 
             db.Content.Add(content);
             Logger.Information("Added {id} [{type}] to Index", content.Id, content.Type);
-            db.SaveChangesSafe();
+            db.SaveChanges();
             return;
         }
 
@@ -182,7 +182,7 @@ public class Indexer
                 indexCopy.VersionMeta.Version = content.VersionMeta.Version;
                 indexCopy.VersionMeta.Path = content.VersionMeta.Path;
                 indexCopy.VersionMeta.PatchedBy = [];
-                db.SaveChangesSafe();
+                db.SaveChanges();
                 return;
             // The second is an Imposter avatar, which we don't want to index.
             case ContentType.Avatar:
@@ -262,7 +262,7 @@ public class Indexer
 
 
         db.Content.Remove(indexMatch);
-        db.SaveChangesSafe();
+        db.SaveChanges();
         Logger.Information("Removed {id} from Index", indexMatch.Id);
     }
 
