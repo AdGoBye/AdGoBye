@@ -82,7 +82,7 @@ public static class Blocklist
             blocklistEntries.RemoveRange(danglingBlocklist);
         }
 
-        db.SaveChanges();
+        db.SaveChangesSafe();
 
         foreach (var optionsUrl in Settings.Options.BlocklistUrLs)
         {
@@ -112,7 +112,7 @@ public static class Blocklist
                 if (blocklistDownload.Value.ETag is not null) databaseQuery.ETag = blocklistDownload.Value.ETag;
             }
 
-            db.SaveChanges();
+            db.SaveChangesSafe();
         }
     }
 
