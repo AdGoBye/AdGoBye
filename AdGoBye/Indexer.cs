@@ -94,13 +94,14 @@ public class Indexer
     public static void AddToIndex(IEnumerable<DirectoryInfo?> paths)
     {
         ConcurrentBag<Content> contents = [];
-        Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxIndexerThreads }, path =>
-        {
-            if (path != null && AddToIndexPart1(path.FullName, out var content) && content != null)
+        Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxIndexerThreads },
+            path =>
             {
-                contents.Add(content);
-            }
-        });
+                if (path != null && AddToIndexPart1(path.FullName, out var content) && content != null)
+                {
+                    contents.Add(content);
+                }
+            });
 
         var groupedById = contents.GroupBy(content => content.Id);
 
@@ -276,13 +277,15 @@ public class Indexer
 
         var estimatedUncompressedSize = EstimateDecompressedSize(container.Bundle.file);
 
-        if(estimatedUncompressedSize > (Settings.Options.ZipBombSizeLimitMB * 1000L * 1000L))
+        if (estimatedUncompressedSize > (Settings.Options.ZipBombSizeLimitMB * 1000L * 1000L))
         {
-            Logger.Warning("Skipped {ID} ({directory}) because it's likely a ZIP Bomb ({estimatedMB}MB uncompressed).", content.Id, content.VersionMeta.Path, (estimatedUncompressedSize / 1000 / 1000));
+            Logger.Warning("Skipped {ID} ({directory}) because it's likely a ZIP Bomb ({estimatedMB}MB uncompressed).",
+                content.Id, content.VersionMeta.Path, (estimatedUncompressedSize / 1000 / 1000));
             return;
         }
 
         var pluginOverridesBlocklist = false;
+        var someoneModifiedBundle = false;
         foreach (var plugin in PluginLoader.LoadedPlugins)
         {
             try
@@ -304,7 +307,11 @@ public class Indexer
                 if (plugin.Instance.Verify(content, ref container) is not EVerifyResult.Success)
                     pluginApplies = false;
 
-                if (pluginApplies) plugin.Instance.Patch(content, ref container);
+                if (pluginApplies)
+                {
+                    var patchResult = plugin.Instance.Patch(content, ref container);
+                    if (patchResult == EPatchResult.Success) someoneModifiedBundle = true;
+                }
 
                 if (!Settings.Options.DryRun && plugin.Instance.WantsIndexerTracking())
                     content.VersionMeta.PatchedBy.Add(plugin.Name);
@@ -329,6 +336,8 @@ public class Indexer
                     var unmatchedObjects = Blocklist.Patch(container, block.Value.ToArray());
                     if (Settings.Options.SendUnmatchedObjectsToDevs && unmatchedObjects is not null)
                         Blocklist.SendUnpatchedObjects(content, unmatchedObjects);
+                    if (unmatchedObjects is not null && unmatchedObjects.Count != block.Value.ToArray().Length)
+                        someoneModifiedBundle = true;
                 }
                 catch (Exception e)
                 {
@@ -338,6 +347,7 @@ public class Indexer
         }
 
         if (Settings.Options.DryRun) return;
+        if (!someoneModifiedBundle) return;
 
         Logger.Information("Done, writing changes as bundle");
 
@@ -347,10 +357,12 @@ public class Indexer
         if (Settings.Options.EnableRecompression)
         {
             if (estimatedUncompressedSize > Settings.Options.RecompressionMemoryMaxMB * 1000L * 1000L
-                || estimatedUncompressedSize >= 1_900_000_000) // 1.9GB hard limit to leave a 100MB buffer just in case the estimation is off.
+                || estimatedUncompressedSize >=
+                1_900_000_000) // 1.9GB hard limit to leave a 100MB buffer just in case the estimation is off.
             {
                 var tempFileName = file + ".uncompressed";
-                using var uncompressedFs = File.Open(tempFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                using var uncompressedFs = File.Open(tempFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite,
+                    FileShare.None);
                 CompressAndWrite(uncompressedFs);
                 File.Delete(tempFileName);
             }
