@@ -18,6 +18,7 @@ public class Indexer
     public static void ManageIndex()
     {
         using var db = new State.IndexContext();
+        if (db.Content.Any()) VerifyDbTruth();
         const int maxRetries = 3;
         const int delayMilliseconds = 5000;
 
