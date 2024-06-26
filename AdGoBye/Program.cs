@@ -46,7 +46,8 @@ if (Blocklist.Blocks == null || Blocklist.Blocks.Count == 0)
 logger.Information("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
     Blocklist.Blocks?.Count, db.Content.Count());
 
-Parallel.ForEach(db.Content.Include(content => content.VersionMeta), content =>
+Parallel.ForEach(db.Content.Include(content => content.VersionMeta),
+    new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxPatchThreads }, content =>
 {
     if (content.Type != ContentType.World) return;
     Indexer.PatchContent(content);
