@@ -346,7 +346,7 @@ public class Indexer
 
         if (Settings.Options.EnableRecompression)
         {
-            if (estimatedUncompressedSize > (Settings.Options.RecompressionMemoryMaxMB * 1000L * 1000L) 
+            if (estimatedUncompressedSize > Settings.Options.RecompressionMemoryMaxMB * 1000L * 1000L
                 || estimatedUncompressedSize >= 1_900_000_000) // 1.9GB hard limit to leave a 100MB buffer just in case the estimation is off.
             {
                 var tempFileName = file + ".uncompressed";
