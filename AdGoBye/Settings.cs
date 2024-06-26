@@ -30,6 +30,8 @@ public static class Settings
         public bool DisablePluginInstallWarning { get; set; }
         public bool DisableBackupFile { get; set; }
         public bool EnableRecompression { get; set; }
+        public int MaxIndexerThreads { get; set; }
+        public int MaxPatchThreads { get; set; }
         public int RecompressionMemoryMaxMB { get; set; }
         public int ZipBombSizeLimitMB { get; set; }
     }

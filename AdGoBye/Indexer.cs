@@ -94,7 +94,7 @@ public class Indexer
     public static void AddToIndex(IEnumerable<DirectoryInfo?> paths)
     {
         ConcurrentBag<Content> contents = [];
-        Parallel.ForEach(paths, path =>
+        Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxIndexerThreads }, path =>
         {
             if (path != null && AddToIndexPart1(path.FullName, out var content) && content != null)
             {
