@@ -22,7 +22,33 @@ public class Indexer
         if (db.Content.Any()) VerifyDbTruth(ref container);
         CommitToDatabase(container);
 
-        var contentFolders = new DirectoryInfo(GetCacheDir()).GetDirectories();
+        const int maxRetries = 3;
+        const int delayMilliseconds = 5000;
+
+        DirectoryInfo[]? contentFolders = null;
+        for (var retry = 0; retry < maxRetries; retry++)
+        {
+            try
+            {
+                contentFolders = new DirectoryInfo(GetCacheDir()).GetDirectories();
+                break;
+            }
+            catch (DirectoryNotFoundException ex)
+            {
+                // print exception with exception message if it's the last retry
+                if (retry == maxRetries - 1)
+                {
+                    Logger.Fatal(ex, "Max retries reached. Unable to find your game's Cache directory, please define the folder above manually in appsettings.json as 'WorkingFolder'.");
+                    Environment.Exit(1);
+                }
+                else
+                {
+                    Logger.Error($"Directory not found attempting retry: {retry + 1} of {maxRetries}");
+                }
+                Thread.Sleep(delayMilliseconds); 
+            }
+        }
+        
         if (contentFolders.Length == db.Content.Count() - SafeAllowlistCount()) return;
 
         var content = contentFolders
