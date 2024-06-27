@@ -6,19 +6,9 @@ public abstract class State
 {
     public sealed class IndexContext : DbContext
     {
-        private static readonly object SaveLock = new object();
-
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
             options.UseSqlite("Data Source=database.db");
-        }
-
-        public void SaveChangesSafe()
-        {
-            lock (SaveLock)
-            {
-                SaveChanges();
-            }
         }
 
 #pragma warning disable CS8618 //

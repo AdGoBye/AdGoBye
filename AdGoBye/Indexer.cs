@@ -18,7 +18,10 @@ public class Indexer
     public static void ManageIndex()
     {
         using var db = new State.IndexContext();
-        if (db.Content.Any()) VerifyDbTruth();
+        var container = new DatabaseOperationsContainer();
+        if (db.Content.Any()) VerifyDbTruth(ref container);
+        CommitToDatabase(container);
+
         var contentFolders = new DirectoryInfo(GetCacheDir()).GetDirectories();
         if (contentFolders.Length == db.Content.Count() - SafeAllowlistCount()) return;
 
@@ -41,7 +44,7 @@ public class Indexer
         }
     }
 
-    private static void VerifyDbTruth()
+    private static void VerifyDbTruth(ref DatabaseOperationsContainer container)
     {
         using var db = new State.IndexContext();
         foreach (var content in db.Content.Include(content => content.VersionMeta))
@@ -49,7 +52,7 @@ public class Indexer
             var directoryMeta = new DirectoryInfo(content.VersionMeta.Path);
             if (!directoryMeta.Parent!.Exists) // This content doesn't have a StableContentId folder anymore
             {
-                db.Remove(content);
+                container.RemoveContent.Add(content);
                 continue;
             }
 
@@ -67,7 +70,7 @@ public class Indexer
 
             if (!File.Exists(highestVersionDir.FullName + "/__data"))
             {
-                db.Remove(content);
+                container.RemoveContent.Add(content);
                 Logger.Warning(
                     "{directory} is highest version but doesn't have __data, hell might have frozen over. Removed from Index",
                     highestVersionDir.FullName);
@@ -78,43 +81,41 @@ public class Indexer
             content.VersionMeta.Version = highestVersion;
             content.VersionMeta.Path = highestVersionDir.FullName;
             content.VersionMeta.PatchedBy = [];
+            container.EditContent.Add(content);
         }
-
-        db.SaveChangesSafe();
     }
 
     public static void AddToIndex(string path)
     {
-        if (AddToIndexPart1(path, out var content) && content != null)
-        {
-            AddToIndexPart2(content);
-        }
+        var container = new DatabaseOperationsContainer();
+        AddToIndexPart1(path, ref container);
+        if (!container.AddContent.IsEmpty) AddToIndexPart2(container.AddContent.First(), ref container);
+        CommitToDatabase(container);
     }
 
     public static void AddToIndex(IEnumerable<DirectoryInfo?> paths)
     {
-        ConcurrentBag<Content> contents = [];
-        Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxIndexerThreads },
-            path =>
-            {
-                if (path != null && AddToIndexPart1(path.FullName, out var content) && content != null)
-                {
-                    contents.Add(content);
-                }
+        var dbActionsContainer = new DatabaseOperationsContainer();
+        Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxIndexerThreads },path =>
+        {
+            if (path != null) AddToIndexPart1(path.FullName, ref dbActionsContainer);
             });
 
-        var groupedById = contents.GroupBy(content => content.Id);
-
+        var groupedById = dbActionsContainer.AddContent.GroupBy(content => content.Id);
         Parallel.ForEach(groupedById, group =>
         {
-            foreach (var content in group)
             {
-                AddToIndexPart2(content);
+                foreach (var content in group)
+                {
+                    AddToIndexPart2(content, ref dbActionsContainer);
+                }
             }
         });
+
+        CommitToDatabase(dbActionsContainer);
     }
 
-    public static bool AddToIndexPart1(string path, out Content? content)
+    public static void AddToIndexPart1(string path, ref DatabaseOperationsContainer container)
     {
         using var db = new State.IndexContext();
         //   - Folder (StableContentName) [singleton, we want this]
@@ -126,7 +127,7 @@ public class Indexer
         if (directory.Name == "__data") directory = directory.Parent;
 
         // If we already have an item in Index that has the same StableContentName, then this is a newer version of something Indexed
-        content = db.Content.Include(content => content.VersionMeta)
+        var content = db.Content.Include(content => content.VersionMeta)
             .FirstOrDefault(content => content.StableContentName == directory!.Parent!.Name);
         if (content is not null)
         {
@@ -136,23 +137,22 @@ public class Indexer
                 Logger.Verbose(
                     "Skipped Indexation of {directory} since it isn't an upgrade (Index: {greaterVersion}, Parsed: {lesserVersion})",
                     directory.FullName, content.VersionMeta.Version, version);
-                return false;
+                return;
             }
 
             content.VersionMeta.Version = version;
             content.VersionMeta.Path = directory.FullName;
             content.VersionMeta.PatchedBy = [];
-
-            db.SaveChangesSafe();
-            return false;
+            container.EditContent.Add(content);
+            return;
         }
 
-        if (!File.Exists(directory!.FullName + "/__data")) return false;
+        if (!File.Exists(directory!.FullName + "/__data")) return;
         content = FileToContent(directory);
-        return true;
+        if (content is not null) container.AddContent.Add(content);
     }
 
-    private static void AddToIndexPart2(Content content)
+    private static void AddToIndexPart2(Content content, ref DatabaseOperationsContainer container)
     {
         using var db = new State.IndexContext();
         var indexCopy = db.Content.Include(existingFile => existingFile.VersionMeta)
@@ -166,9 +166,8 @@ public class Indexer
                 return;
             }
 
-            db.Content.Add(content);
+            container.AddContent.Add(content);
             Logger.Information("Added {id} [{type}] to Index", content.Id, content.Type);
-            db.SaveChangesSafe();
             return;
         }
 
@@ -183,7 +182,7 @@ public class Indexer
                 indexCopy.VersionMeta.Version = content.VersionMeta.Version;
                 indexCopy.VersionMeta.Path = content.VersionMeta.Path;
                 indexCopy.VersionMeta.PatchedBy = [];
-                db.SaveChangesSafe();
+                container.EditContent.Add(indexCopy);
                 return;
             // The second is an Imposter avatar, which we don't want to index.
             case ContentType.Avatar:
@@ -246,6 +245,15 @@ public class Indexer
         }
     }
 
+    private static void CommitToDatabase(DatabaseOperationsContainer container)
+    {
+        using var writeDbContext = new State.IndexContext();
+        writeDbContext.Content.AddRange(container.AddContent);
+        writeDbContext.Content.UpdateRange(container.EditContent);
+        writeDbContext.Content.RemoveRange(container.RemoveContent);
+        writeDbContext.SaveChanges();
+    }
+
 
     public static Content? GetFromIndex(string path)
     {
@@ -263,7 +271,7 @@ public class Indexer
 
 
         db.Content.Remove(indexMatch);
-        db.SaveChangesSafe();
+        db.SaveChanges();
         Logger.Information("Removed {id} from Index", indexMatch.Id);
     }
 
@@ -571,5 +579,12 @@ public class Indexer
     private static string GetCacheDir()
     {
         return WorkingDirectory + "/Cache-WindowsPlayer/";
+    }
+
+    public record DatabaseOperationsContainer
+    {
+        public ConcurrentBag<Content> AddContent = [];
+        public ConcurrentBag<Content> EditContent = [];
+        public ConcurrentBag<Content> RemoveContent = [];
     }
 }
