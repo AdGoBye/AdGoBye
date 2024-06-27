@@ -1,4 +1,5 @@
-﻿using AdGoBye.Plugins;
+﻿using AdGoBye.PluginInternal;
+using AdGoBye.Plugins;
 using AssetsTools.NET;
 using Serilog;
 
@@ -27,6 +28,7 @@ namespace AdGoBye
 
             var pluginOverridesBlocklist = false;
             var someoneModifiedBundle = false;
+            var pluginsDidPatch = new List<PluginEntry>();
             foreach (var plugin in PluginLoader.LoadedPlugins)
             {
                 try
@@ -51,7 +53,11 @@ namespace AdGoBye
                     if (pluginApplies)
                     {
                         var patchResult = plugin.Instance.Patch(content, ref container);
-                        if (patchResult == EPatchResult.Success) someoneModifiedBundle = true;
+                        if (patchResult == EPatchResult.Success)
+                        {
+                            someoneModifiedBundle = true;
+                            pluginsDidPatch.Add(plugin);
+                        }
                     }
 
                     if (!Settings.Options.DryRun && plugin.Instance.WantsIndexerTracking())
@@ -144,6 +150,19 @@ namespace AdGoBye
             File.Replace(file + ".clean", file, Settings.Options.DisableBackupFile ? null : file + ".bak");
 
             if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
+            foreach(var plugin in pluginsDidPatch)
+            {
+                try
+                {
+                    plugin.Instance.PostDiskWrite(content);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e,
+                        "Plugin {Name} ({Maintainer}) v{Version} threw an exception while handling post disk write {ID} ({path})",
+                        plugin.Name, plugin.Maintainer, plugin.Version, content.Id, content.VersionMeta.Path);
+                }
+            }
             Logger.Information("Processed {ID}", content.Id);
         }
 
