@@ -35,7 +35,7 @@ public class Indexer
                 // print exception with exception message if it's the last retry
                 if (retry == maxRetries - 1)
                 {
-                    Logger.Fatal(ex, "Max retries reached. Unable to find your game's Cache directory, please define the folder above manually in appsettings.json as 'WorkingFolder', closing in 5 seconds.");
+                    Logger.Fatal(ex, "Max retries reached. Unable to find your game's Cache directory, please define the folder above manually in appsettings.json as 'WorkingFolder'.");
                     Environment.Exit(1);
                 }
                 else
