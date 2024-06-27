@@ -39,6 +39,11 @@ public class BasePlugin : IPlugin
     {
     }
 
+    public virtual void PostDiskWrite(Content context)
+    {
+        
+    }
+
     public virtual bool WantsIndexerTracking()
     {
         return true;

@@ -68,4 +68,10 @@ public interface IPlugin
     /// </summary>
     /// <param name="context">The asset that has been operated on</param>
     void PostPatch(Content context);
+    
+    /// <summary>
+    /// PostDiskWrite is an optional function ran after <see cref="PostPatch"/> when all operations to disk have been completed.
+    /// </summary>
+    /// <param name="context">The asset that has been operated on</param>
+    void PostDiskWrite(Content context);
 }
