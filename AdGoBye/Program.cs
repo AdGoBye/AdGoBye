@@ -50,7 +50,7 @@ Parallel.ForEach(db.Content.Include(content => content.VersionMeta),
     new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxPatchThreads }, content =>
 {
     if (content.Type != ContentType.World) return;
-    Indexer.PatchContent(content);
+    Patcher.PatchContent(content);
 });
 
 db.SaveChanges();

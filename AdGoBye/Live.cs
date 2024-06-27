@@ -62,7 +62,7 @@ public static class Live
                 Indexer.AddToIndex(path);
                 Ewh.WaitOne();
                 var newContent = Indexer.GetFromIndex(path);
-                if (newContent is not null) Indexer.PatchContent(newContent);
+                if (newContent is not null) Patcher.PatchContent(newContent);
                 done = true;
             }
             catch (EndOfStreamException)
