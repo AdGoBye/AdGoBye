@@ -35,7 +35,8 @@ public class Indexer
                 // print exception with exception message if it's the last retry
                 if (retry == maxRetries - 1)
                 {
-                    Logger.Error(ex, $"Directory not found attempting retry: {retry + 1} of {maxRetries}: Directory not found. No more retries.");
+                    Logger.Fatal(ex, "Max retries reached. Unable to find your game's Cache directory, please define the folder above manually in appsettings.json as 'WorkingFolder', closing in 5 seconds.");
+                    Environment.Exit(1);
                 }
                 else
                 {
@@ -43,13 +44,6 @@ public class Indexer
                 }
                 Thread.Sleep(delayMilliseconds); 
             }
-        }
-        
-        if (contentFolders == null)
-        {
-            Logger.Error("Max retries reached. Unable to find directory please define it manually in appsettings.json, closing in 5 seconds.");
-            Thread.Sleep(delayMilliseconds);
-            Environment.Exit(0);
         }
         
         if (contentFolders.Length == db.Content.Count() - SafeAllowlistCount()) return;
