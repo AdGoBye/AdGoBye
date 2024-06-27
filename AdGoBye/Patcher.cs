@@ -74,10 +74,7 @@ namespace AdGoBye
                 {
                     try
                     {
-                        var unmatchedObjects = Blocklist.Patch(container, block.Value.ToArray());
-                        if (Settings.Options.SendUnmatchedObjectsToDevs && unmatchedObjects is not null)
-                            Blocklist.SendUnpatchedObjects(content, unmatchedObjects);
-                        if (unmatchedObjects is not null && unmatchedObjects.Count != block.Value.ToArray().Length)
+                        if (Blocklist.Patch(content, container, block.Value.ToArray()))
                             someoneModifiedBundle = true;
                     }
                     catch (Exception e)
