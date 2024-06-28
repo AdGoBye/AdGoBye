@@ -251,7 +251,7 @@ public static class Blocklist
                 "Following blocklist objects weren't disabled: {@UnpatchedList}" +
                 "\nThis can mean that these blocklist entries are outdated, consider informing the maintainer",
                 unpatchedObjects);
-            if (Settings.Options.SendUnmatchedObjectsToDevs)
+            if (Settings.Options.Blacklist.SendUnmatchedObjectsToDevs)
                 SendUnpatchedObjects(content, unpatchedObjects);
         }
 
