@@ -40,7 +40,18 @@ public static class Live
 
         watcher.Error += (_, e) =>
         {
-            Logger.Error("{source}: {exception}", e.GetException().Message, e.GetException().Message);
+            switch (e.GetException())
+            {
+                case InternalBufferOverflowException:
+                    Logger.Error(
+                        "FileSystemWatcher's internal buffer experienced an overflow, we may have missed some file events!\n" +
+                        "Your Indexer state may not correct anymore, restart if something doesn't work.\n" +
+                        "If you experience this often, please tell us at https://github.com/AdGoBye/AdGoBye/issues.");
+                    break;
+                default:
+                    Logger.Error("FileSystemWatcher threw an exception: {exception}", e);
+                    break;
+            }
         };
 
         watcher.Filter = "__info";
