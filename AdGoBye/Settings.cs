@@ -40,7 +40,7 @@ public static class Settings
             if (settingsV1 == null)
                 return false;
 
-            settingsV2.Blocklist.BlocklistUrLs = settingsV1.BlocklistUrLs;
+            settingsV2.Blocklist.BlocklistUrls = settingsV1.BlocklistUrLs;
             settingsV2.Blocklist.SendUnmatchedObjectsToDevs = settingsV1.SendUnmatchedObjectsToDevs;
             settingsV2.Blocklist.BlocklistUnmatchedServer = settingsV1.BlocklistUnmatchedServer;
             settingsV2.Indexer.WorkingFolder = settingsV1.WorkingFolder;
@@ -86,7 +86,7 @@ public static class Settings
 
     public class BlocklistOptions
     {
-        public string[] BlocklistUrLs { get; set; } = [];
+        public string[] BlocklistUrls { get; set; } = [];
         public bool SendUnmatchedObjectsToDevs { get; set; }
         public string? BlocklistUnmatchedServer { get; set; }
     }

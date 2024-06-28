@@ -76,7 +76,7 @@ public static class Blocklist
         using var db = new State.IndexContext();
         var blocklistEntries = db.NetworkBlocklists;
         foreach (var danglingBlocklist in blocklistEntries.Where(blocklist =>
-                     Settings.Options.Blocklist.BlocklistUrLs.All(url => url != blocklist.Url)))
+                     Settings.Options.Blocklist.BlocklistUrls.All(url => url != blocklist.Url)))
         {
             Logger.Information("Removing dangling blocklist for {url}", danglingBlocklist.Url);
             blocklistEntries.RemoveRange(danglingBlocklist);
@@ -84,7 +84,7 @@ public static class Blocklist
 
         db.SaveChanges();
 
-        foreach (var optionsUrl in Settings.Options.Blocklist.BlocklistUrLs)
+        foreach (var optionsUrl in Settings.Options.Blocklist.BlocklistUrls)
         {
             var databaseQuery = blocklistEntries
                 .FirstOrDefault(databaseEntry => databaseEntry.Url == optionsUrl);
@@ -127,7 +127,7 @@ public static class Blocklist
             ParseAndAddBlocklist(file, File.ReadAllText(file));
         }
 
-        if (Settings.Options.Blocklist.BlocklistUrLs.Length is 0) return final;
+        if (Settings.Options.Blocklist.BlocklistUrls.Length is 0) return final;
 
         foreach (var blocklist in db.NetworkBlocklists)
         {
