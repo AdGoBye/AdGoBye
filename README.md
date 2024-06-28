@@ -1,4 +1,6 @@
 # AdGoBye - Defusing Advertisements in Virtual Reality
+<a href="https://matrix.to/#/#adgobyeworks:catgirl.cloud"><img src="https://img.shields.io/matrix/adgobyeworks%3Acatgirl.cloud.svg?server_fqdn=matrix.org&style=flat-squared&logo=matrix&label=Matrix" /></a>
+<a href="https://discord.gg/VgMnEr3xDk"><img src="https://img.shields.io/discord/1256021895263031407.svg?style=flat-squared&logo=discord&label=Discord" /></a>
 
 ## Rationale
 
