@@ -24,10 +24,7 @@ public static class Settings
 
     private static bool ConvertV1SettingsToV2(IConfigurationRoot? config)
     {
-        if (config == null)
-            return false;
-
-        var section = config.GetRequiredSection("Settings");
+        var section = config?.GetRequiredSection("Settings");
         if (section == null)
             return false;
 
