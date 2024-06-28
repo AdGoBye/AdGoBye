@@ -209,10 +209,11 @@ public static class Blocklist
     }
 
 
-    public static List<GameObjectInstance>? Patch(ContentAssetManagerContainer assetContainer,
+    public static bool Patch(Content content, ContentAssetManagerContainer assetContainer,
         GameObjectInstance[] gameObjectsToDisable)
     {
         var patchedGameObjects = new List<GameObjectInstance>();
+        var anyModifications = false;
 
         foreach (var gameObject in assetContainer.AssetsFile.file.GetAssetsOfType(AssetClassID.GameObject))
         {
@@ -238,18 +239,23 @@ public static class Blocklist
                 assetContainer.Bundle.file.BlockAndDirInfo.DirectoryInfos[1]
                     .SetNewData(assetContainer.AssetsFile.file);
                 patchedGameObjects.Add(blocklistGameObject);
+                anyModifications = true;
                 Logger.Debug("Found and disabled {gameObjectName}", blocklistGameObject.Name);
             }
         }
 
         var unpatchedObjects = gameObjectsToDisable.Except(patchedGameObjects).ToList();
         if (unpatchedObjects.Count != 0)
+        {
             Logger.Warning(
                 "Following blocklist objects weren't disabled: {@UnpatchedList}" +
                 "\nThis can mean that these blocklist entries are outdated, consider informing the maintainer",
                 unpatchedObjects);
+            if (Settings.Options.SendUnmatchedObjectsToDevs)
+                SendUnpatchedObjects(content, unpatchedObjects);
+        }
 
-        return unpatchedObjects.Count != 0 ? unpatchedObjects : null;
+        return anyModifications;
 
         bool DoesParentMatch(AssetExternal FatherPos, AssetsFileInstance assetsFileInstance,
             GameObjectInstance blocklistGameObject)
