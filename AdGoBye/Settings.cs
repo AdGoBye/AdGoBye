@@ -73,9 +73,9 @@ public static class Settings
     public class SettingsOptionsV2
     {
         public int ConfigVersion { get; set; } = 2;
-        public BlocklistOptions Blocklist { get; set; } = new BlocklistOptions();
-        public IndexerOptions Indexer { get; set; } = new IndexerOptions();
-        public PatcherOptions Patcher { get; set; } = new PatcherOptions();
+        public BlocklistOptions Blocklist { get; set; } = new();
+        public IndexerOptions Indexer { get; set; } = new();
+        public PatcherOptions Patcher { get; set; } = new();
         public bool EnableUpdateCheck { get; set; }
         public int LogLevel { get; set; }
         public bool EnableLive { get; set; }
