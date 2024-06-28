@@ -66,7 +66,7 @@ public class Indexer
 
         static int SafeAllowlistCount()
         {
-            return Settings.Options.Allowlist is not null ? Settings.Options.Allowlist.Length : 0;
+            return Settings.Options.Indexer.Allowlist is not null ? Settings.Options.Indexer.Allowlist.Length : 0;
         }
     }
 
@@ -434,7 +434,7 @@ public class Indexer
     [SuppressMessage("ReSharper", "StringLiteralTypo")]
     private static string GetWorkingDirectory()
     {
-        if (!string.IsNullOrEmpty(Settings.Options.WorkingFolder)) return Settings.Options.WorkingFolder;
+        if (!string.IsNullOrEmpty(Settings.Options.Indexer.WorkingFolder)) return Settings.Options.Indexer.WorkingFolder;
         var appName = SteamParser.GetApplicationName();
         var pathToWorkingDir = $"{appName}/{appName}/";
 

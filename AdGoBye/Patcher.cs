@@ -19,7 +19,7 @@ namespace AdGoBye
 
             var estimatedUncompressedSize = EstimateDecompressedSize(container.Bundle.file);
 
-            if (estimatedUncompressedSize > (Settings.Options.ZipBombSizeLimitMB * 1000L * 1000L))
+            if (estimatedUncompressedSize > (Settings.Options.Patcher.ZipBombSizeLimitMB * 1000L * 1000L))
             {
                 Logger.Warning("Skipped {ID} ({directory}) because it's likely a ZIP Bomb ({estimatedMB}MB uncompressed).",
                     content.Id, content.VersionMeta.Path, (estimatedUncompressedSize / 1000 / 1000));
@@ -60,7 +60,7 @@ namespace AdGoBye
                         }
                     }
 
-                    if (!Settings.Options.DryRun && plugin.Instance.WantsIndexerTracking())
+                    if (!Settings.Options.Patcher.DryRun && plugin.Instance.WantsIndexerTracking())
                         content.VersionMeta.PatchedBy.Add(plugin.Name);
 
                     plugin.Instance.PostPatch(content);
@@ -81,7 +81,7 @@ namespace AdGoBye
                     try
                     {
                         var unmatchedObjects = Blocklist.Patch(container, block.Value.ToArray());
-                        if (Settings.Options.SendUnmatchedObjectsToDevs && unmatchedObjects is not null)
+                        if (Settings.Options.Blacklist.SendUnmatchedObjectsToDevs && unmatchedObjects is not null)
                             Blocklist.SendUnpatchedObjects(content, unmatchedObjects);
                         if (unmatchedObjects is not null && unmatchedObjects.Count != block.Value.ToArray().Length)
                             someoneModifiedBundle = true;
@@ -93,7 +93,7 @@ namespace AdGoBye
                 }
             }
 
-            if (Settings.Options.DryRun) return;
+            if (Settings.Options.Patcher.DryRun) return;
             if (!someoneModifiedBundle) return;
 
             Logger.Information("Done, writing changes as bundle");
@@ -101,9 +101,9 @@ namespace AdGoBye
             container.Bundle.file.BlockAndDirInfo.DirectoryInfos[1].SetNewData(container.AssetsFile.file);
             using var writer = new AssetsFileWriter(file + ".clean");
 
-            if (Settings.Options.EnableRecompression)
+            if (Settings.Options.Patcher.EnableRecompression)
             {
-                if (estimatedUncompressedSize > Settings.Options.RecompressionMemoryMaxMB * 1000L * 1000L
+                if (estimatedUncompressedSize > Settings.Options.Patcher.RecompressionMemoryMaxMB * 1000L * 1000L
                     || estimatedUncompressedSize >=
                     1_900_000_000) // 1.9GB hard limit to leave a 100MB buffer just in case the estimation is off.
                 {
@@ -147,9 +147,9 @@ namespace AdGoBye
             container.Bundle.file.Close();
             container.AssetsFile.file.Close();
 
-            File.Replace(file + ".clean", file, Settings.Options.DisableBackupFile ? null : file + ".bak");
+            File.Replace(file + ".clean", file, Settings.Options.Patcher.DisableBackupFile ? null : file + ".bak");
 
-            if (!Settings.Options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
+            if (!Settings.Options.Patcher.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
             foreach(var plugin in pluginsDidPatch)
             {
                 try
