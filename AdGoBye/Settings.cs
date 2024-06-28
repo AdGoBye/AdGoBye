@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Configuration;
 
 namespace AdGoBye;
 
@@ -12,11 +12,13 @@ public static class Settings
             .AddJsonFile("appsettings.json")
             .Build();
 
-        if(ConvertV1SettingsToV2(config))
+        if (ConvertV1SettingsToV2(config))
             config.Reload();
 
         Options = config.GetRequiredSection("Settings").Get<SettingsOptionsV2>() ?? new SettingsOptionsV2();
     }
+
+    public static SettingsOptionsV2 Options { get; set; }
 
     #region appsettings.json conversion methods
 
@@ -38,9 +40,9 @@ public static class Settings
             if (settingsV1 == null)
                 return false;
 
-            settingsV2.Blacklist.BlocklistUrLs = settingsV1.BlocklistUrLs;
-            settingsV2.Blacklist.SendUnmatchedObjectsToDevs = settingsV1.SendUnmatchedObjectsToDevs;
-            settingsV2.Blacklist.BlocklistUnmatchedServer = settingsV1.BlocklistUnmatchedServer;
+            settingsV2.Blocklist.BlocklistUrLs = settingsV1.BlocklistUrLs;
+            settingsV2.Blocklist.SendUnmatchedObjectsToDevs = settingsV1.SendUnmatchedObjectsToDevs;
+            settingsV2.Blocklist.BlocklistUnmatchedServer = settingsV1.BlocklistUnmatchedServer;
             settingsV2.Indexer.WorkingFolder = settingsV1.WorkingFolder;
             settingsV2.Indexer.Allowlist = settingsV1.Allowlist;
             settingsV2.Patcher.DryRun = settingsV1.DryRun;
@@ -57,7 +59,8 @@ public static class Settings
 
             var jsonObject = JsonObject.Parse(File.ReadAllText("appsettings.json"));
             jsonObject["Settings"] = JsonNode.Parse(JsonSerializer.Serialize(settingsV2));
-            File.WriteAllText("appsettings.json", jsonObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            File.WriteAllText("appsettings.json",
+                jsonObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
 
             return true;
         }
@@ -65,15 +68,12 @@ public static class Settings
         return false;
     }
 
-
     #endregion appsettings.json conversion methods
-
-    public static SettingsOptionsV2 Options { get; set; }
 
     public class SettingsOptionsV2
     {
         public int ConfigVersion { get; set; } = 2;
-        public BlackListOptions Blacklist { get; set; } = new BlackListOptions();
+        public BlocklistOptions Blocklist { get; set; } = new BlocklistOptions();
         public IndexerOptions Indexer { get; set; } = new IndexerOptions();
         public PatcherOptions Patcher { get; set; } = new PatcherOptions();
         public bool EnableUpdateCheck { get; set; }
@@ -84,7 +84,7 @@ public static class Settings
         public int MaxPatchThreads { get; set; }
     }
 
-    public class BlackListOptions
+    public class BlocklistOptions
     {
         public string[] BlocklistUrLs { get; set; } = [];
         public bool SendUnmatchedObjectsToDevs { get; set; }
