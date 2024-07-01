@@ -10,7 +10,7 @@ on:
   pull_request: null
   release:
     types:
-      - created
+      - published
 env:
   DOTNET_VERSION: 8.0.x
 jobs:
