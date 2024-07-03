@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using AdGoBye.Database;
 using AdGoBye.Plugins;
 using AssetsTools.NET;
 using AssetsTools.NET.Extra;
@@ -17,7 +18,7 @@ public class Indexer
 
     public static void ManageIndex()
     {
-        using var db = new State.IndexContext();
+        using var db = new AdGoByeContext();
         var container = new DatabaseOperationsContainer();
         if (db.Content.Any()) VerifyDbTruth(ref container);
         CommitToDatabase(container);
@@ -72,7 +73,7 @@ public class Indexer
 
     private static void VerifyDbTruth(ref DatabaseOperationsContainer container)
     {
-        using var db = new State.IndexContext();
+        using var db = new AdGoByeContext();
         foreach (var content in db.Content.Include(content => content.VersionMeta))
         {
             var directoryMeta = new DirectoryInfo(content.VersionMeta.Path);
@@ -143,7 +144,7 @@ public class Indexer
 
     public static void AddToIndexPart1(string path, ref DatabaseOperationsContainer container)
     {
-        using var db = new State.IndexContext();
+        using var db = new AdGoByeContext();
         //   - Folder (StableContentName) [singleton, we want this]
         //       - Folder (version) [may exist multiple times] 
         //          - __info
@@ -180,7 +181,7 @@ public class Indexer
 
     private static void AddToIndexPart2(Content content, ref DatabaseOperationsContainer container)
     {
-        using var db = new State.IndexContext();
+        using var db = new AdGoByeContext();
         var indexCopy = db.Content.Include(existingFile => existingFile.VersionMeta)
             .FirstOrDefault(existingFile => existingFile.Id == content.Id);
 
@@ -273,7 +274,7 @@ public class Indexer
 
     private static void CommitToDatabase(DatabaseOperationsContainer container)
     {
-        using var writeDbContext = new State.IndexContext();
+        using var writeDbContext = new AdGoByeContext();
         writeDbContext.Content.AddRange(container.AddContent);
         writeDbContext.Content.UpdateRange(container.EditContent);
         writeDbContext.Content.RemoveRange(container.RemoveContent);
@@ -283,7 +284,7 @@ public class Indexer
 
     public static Content? GetFromIndex(string path)
     {
-        using var db = new State.IndexContext();
+        using var db = new AdGoByeContext();
         var directory = new DirectoryInfo(path);
         return db.Content.Include(content => content.VersionMeta)
             .FirstOrDefault(content => content.StableContentName == directory.Parent!.Parent!.Name);
@@ -291,7 +292,7 @@ public class Indexer
 
     public static void RemoveFromIndex(string path)
     {
-        using var db = new State.IndexContext();
+        using var db = new AdGoByeContext();
         var indexMatch = GetFromIndex(path);
         if (indexMatch is null) return;
 

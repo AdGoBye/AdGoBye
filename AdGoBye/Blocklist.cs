@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using AdGoBye.Database;
 using AssetsTools.NET;
 using AssetsTools.NET.Extra;
 using Serilog;
@@ -73,7 +74,7 @@ public static class Blocklist
 
     public static void UpdateNetworkBlocklists()
     {
-        using var db = new State.IndexContext();
+        using var db = new AdGoByeContext();
         var blocklistEntries = db.NetworkBlocklists;
         foreach (var danglingBlocklist in blocklistEntries.Where(blocklist =>
                      Settings.Options.Blocklist.BlocklistUrls.All(url => url != blocklist.Url)))
@@ -119,7 +120,7 @@ public static class Blocklist
 
     private static List<BlocklistModel> GetBlocklists()
     {
-        using var db = new State.IndexContext();
+        using var db = new AdGoByeContext();
         var final = new List<BlocklistModel>();
         Directory.CreateDirectory("./Blocklists");
         foreach (var file in Directory.GetFiles("./Blocklists"))

@@ -1,5 +1,6 @@
 global using AdGoBye.Types;
 using AdGoBye;
+using AdGoBye.Database;
 using AdGoBye.Plugins;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -24,7 +25,7 @@ var logger = Log.ForContext(typeof(Program));
 SingleInstance.Attach();
 if (Settings.Options.EnableUpdateCheck) Updater.CheckUpdates();
 
-await using var db = new State.IndexContext();
+await using var db = new AdGoByeContext();
 db.Database.Migrate();
 Blocklist.UpdateNetworkBlocklists();
 Blocklist.ParseAllBlocklists();
