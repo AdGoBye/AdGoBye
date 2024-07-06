@@ -39,7 +39,7 @@ jobs:
           
           mkdir -p ${{ github.workspace }}/bin
           
-          dotnet publish -c Release -p:PublishDir=${{ github.workspace }}/bin/${{matrix.os}}-build -r ${{matrix.os}} -p:AssemblyFileVersion=${{ github.event.release.tag_name }} -p:IncludeNativeLibrariesForSelfExtract=true -p:UseAppHost=true -p:PublishSingleFile=true  --self-contained false
+          dotnet publish -c Release -p:PublishDir=${{ github.workspace }}/bin/${{matrix.os}}-build -r ${{matrix.os}} -p:AssemblyFileVersion=${{ github.event.release.tag_name }} -p:IncludeNativeLibrariesForSelfExtract=true -p:UseAppHost=true -p:PublishSingleFile=true  --self-contained true
       - name: Build (Debug)
         if: "!startsWith(github.ref, 'refs/tags/')"
         run: >
@@ -47,7 +47,7 @@ jobs:
           
           mkdir -p ${{ github.workspace }}/bin
           
-          dotnet publish -c Debug -p:PublishDir=${{ github.workspace }}/bin/${{matrix.os}}-build -r ${{matrix.os}} -p:AssemblyFileVersion=${{ github.event.release.tag_name }} -p:IncludeNativeLibrariesForSelfExtract=true -p:UseAppHost=true -p:PublishSingleFile=true  --self-contained false
+          dotnet publish -c Debug -p:PublishDir=${{ github.workspace }}/bin/${{matrix.os}}-build -r ${{matrix.os}} -p:AssemblyFileVersion=${{ github.event.release.tag_name }} -p:IncludeNativeLibrariesForSelfExtract=true -p:UseAppHost=true -p:PublishSingleFile=true  --self-contained true
       - name: Upload as artifacts
         uses: actions/upload-artifact@v4
         with:
