@@ -26,7 +26,7 @@ public class Indexer
         const int maxRetries = 3;
         const int delayMilliseconds = 5000;
 
-        DirectoryInfo[]? contentFolders = null;
+        DirectoryInfo[] contentFolders = [];
         for (var retry = 0; retry < maxRetries; retry++)
         {
             try

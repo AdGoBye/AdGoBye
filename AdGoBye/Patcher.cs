@@ -80,7 +80,7 @@ namespace AdGoBye
                 {
                     try
                     {
-                        if (Blocklist.Patch(content, container, block.Value.ToArray()))
+                        if (Blocklist.Patch(content, container, [.. block.Value]))
                             someoneModifiedBundle = true;
                     }
                     catch (Exception e)

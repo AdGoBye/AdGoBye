@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Semver;
 using Serilog;
 
@@ -26,14 +27,14 @@ public static class Updater
 
         if (GetVersionFromRemote() is not { } remoteVersion) return;
 
-        var remoteVersionSemVer = SemVersion.Parse(remoteVersion.tag_name.Replace("v", ""));
+        var remoteVersionSemVer = SemVersion.Parse(remoteVersion.TagName.Replace("v", ""));
         var localVersionSemVer = SemVersion.Parse(GetSelfVersion());
-        Logger.Debug("Remote: {remote}, Local: {local} ", remoteVersion.tag_name, localVersionSemVer);
+        Logger.Debug("Remote: {remote}, Local: {local} ", remoteVersion.TagName, localVersionSemVer);
         if (!localVersionSemVer.IsPrerelease && remoteVersionSemVer.ComparePrecedenceTo(localVersionSemVer) > 0)
         {
             Logger.Information(
                 "New version {remoteVersion} is out, you are using {localVersion}, download the new version at {url}",
-                remoteVersion.tag_name, localVersionSemVer.WithoutMetadata(), remoteVersion.html_url);
+                remoteVersion.TagName, localVersionSemVer.WithoutMetadata(), remoteVersion.HtmlUrl);
             return;
         }
 
@@ -115,19 +116,23 @@ public static class Updater
 
     private static HttpClient CreateHttpClient()
     {
-        var client = new HttpClient();
-        client.Timeout = TimeSpan.FromSeconds(5);
+        var client = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(5)
+        };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("AdGoBye");
         return client;
     }
 }
 
-#pragma warning disable CS8618
-[SuppressMessage("ReSharper", "InconsistentNaming")]
 public class GithubRelease
 {
-    public string html_url { get; init; }
-    public string tag_name { get; init; }
-    public string ETag { get; set; }
+    [JsonPropertyName("html_url")]
+    public string HtmlUrl { get; init; } = null!;
+
+    [JsonPropertyName("tag_name")]
+    public string TagName { get; init; } = null!;
+
+    [JsonPropertyName("ETag")]
+    public string ETag { get; set; } = null!;
 }
-#pragma warning restore CS8618

@@ -22,59 +22,60 @@ internal class Program
         };
 #endif
 
-var levelSwitch = new LoggingLevelSwitch
-{
-    MinimumLevel = (LogEventLevel)Settings.Options.LogLevel
-};
+        var levelSwitch = new LoggingLevelSwitch
+        {
+            MinimumLevel = (LogEventLevel)Settings.Options.LogLevel
+        };
 
-Console.OutputEncoding = System.Text.Encoding.UTF8;
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
-    .WriteTo.Console(new ExpressionTemplate(
-        "[{@t:HH:mm:ss} {@l:u3} {Coalesce(Substring(SourceContext, LastIndexOf(SourceContext, '.') + 1),'<none>')}] {@m}\n{@x}",
-        theme: TemplateTheme.Literate))
-    .CreateLogger();
-var logger = Log.ForContext(typeof(Program));
-SingleInstance.Attach();
-if (Settings.Options.EnableUpdateCheck) Updater.CheckUpdates();
+        Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
+            .WriteTo.Console(new ExpressionTemplate(
+                "[{@t:HH:mm:ss} {@l:u3} {Coalesce(Substring(SourceContext, LastIndexOf(SourceContext, '.') + 1),'<none>')}] {@m}\n{@x}",
+                theme: TemplateTheme.Literate))
+            .CreateLogger();
+        var logger = Log.ForContext(typeof(Program));
 
-await using var db = new AdGoByeContext();
-db.Database.Migrate();
-Blocklist.UpdateNetworkBlocklists();
-Blocklist.ParseAllBlocklists();
-Indexer.ManageIndex();
+        SingleInstance.Attach();
 
-PluginLoader.LoadPlugins();
-foreach (var plugin in PluginLoader.LoadedPlugins)
-{
-    logger.Information("Plugin {Name} ({Maintainer}) v{Version} is loaded.", plugin.Name, plugin.Maintainer,
-        plugin.Version);
-    logger.Information("Plugin type: {Type}", plugin.Instance.PluginType());
+        if (Settings.Options.EnableUpdateCheck) Updater.CheckUpdates();
 
-    if (plugin.Instance.PluginType() == EPluginType.ContentSpecific)
-        logger.Information("Responsible for {IDs}", plugin.Instance.ResponsibleForContentIds());
-}
+        await using var db = new AdGoByeContext();
+        db.Database.Migrate();
+        Blocklist.UpdateNetworkBlocklists();
+        Blocklist.ParseAllBlocklists();
+        Indexer.ManageIndex();
 
-if (Blocklist.Blocks == null || Blocklist.Blocks.Count == 0)
-    logger.Information("No blocklist has been loaded, is this intentional?");
-logger.Information("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
-    Blocklist.Blocks?.Count, db.Content.Count());
+        PluginLoader.LoadPlugins();
+        foreach (var plugin in PluginLoader.LoadedPlugins)
+        {
+            logger.Information("Plugin {Name} ({Maintainer}) v{Version} is loaded.", plugin.Name, plugin.Maintainer,
+                plugin.Version);
+            logger.Information("Plugin type: {Type}", plugin.Instance.PluginType());
 
-Parallel.ForEach(db.Content.Include(content => content.VersionMeta),
-    new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxPatchThreads }, content =>
-{
-    if (content.Type != ContentType.World) return;
-    Patcher.PatchContent(content);
-});
+            if (plugin.Instance.PluginType() == EPluginType.ContentSpecific)
+                logger.Information("Responsible for {IDs}", plugin.Instance.ResponsibleForContentIds());
+        }
 
-db.SaveChanges();
+        if (Blocklist.Blocks == null || Blocklist.Blocks.Count == 0)
+            logger.Information("No blocklist has been loaded, is this intentional?");
+        logger.Information("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
+            Blocklist.Blocks?.Count, db.Content.Count());
 
-#pragma warning disable CS4014
-if (Settings.Options.EnableLive)
-{
-    Task.Run(() => Live.WatchNewContent(Indexer.WorkingDirectory));
-    Task.Run(() => Live.WatchLogFile(Indexer.WorkingDirectory));
-    await Task.Delay(Timeout.Infinite).ConfigureAwait(false);
-}
+        Parallel.ForEach(db.Content.Include(content => content.VersionMeta),
+            new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxPatchThreads }, content =>
+            {
+                if (content.Type != ContentType.World) return;
+                Patcher.PatchContent(content);
+            });
+
+        db.SaveChanges();
+
+        if (Settings.Options.EnableLive)
+        {
+            _ = Task.Run(() => Live.WatchNewContent(Indexer.WorkingDirectory));
+            _ = Task.Run(() => Live.WatchLogFile(Indexer.WorkingDirectory));
+            await Task.Delay(Timeout.Infinite).ConfigureAwait(false);
+        }
     }
 }
