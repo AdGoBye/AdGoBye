@@ -3,8 +3,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using AdGoBye.Database;
-using AdGoBye.Plugins;
-using AssetsTools.NET;
 using AssetsTools.NET.Extra;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -26,7 +24,7 @@ public class Indexer
         const int maxRetries = 3;
         const int delayMilliseconds = 5000;
 
-        DirectoryInfo[]? contentFolders = null;
+        DirectoryInfo[] contentFolders = [];
         for (var retry = 0; retry < maxRetries; retry++)
         {
             try
@@ -46,10 +44,10 @@ public class Indexer
                 {
                     Logger.Error($"Directory not found attempting retry: {retry + 1} of {maxRetries}");
                 }
-                Thread.Sleep(delayMilliseconds); 
+                Thread.Sleep(delayMilliseconds);
             }
         }
-        
+
         if (contentFolders.Length == db.Content.Count() - SafeAllowlistCount()) return;
 
         var content = contentFolders
@@ -123,10 +121,10 @@ public class Indexer
     public static void AddToIndex(IEnumerable<DirectoryInfo?> paths)
     {
         var dbActionsContainer = new DatabaseOperationsContainer();
-        Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxIndexerThreads },path =>
+        Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxIndexerThreads }, path =>
         {
             if (path != null) AddToIndexPart1(path.FullName, ref dbActionsContainer);
-            });
+        });
 
         var groupedById = dbActionsContainer.AddContent.GroupBy(content => content.Id);
         Parallel.ForEach(groupedById, group =>

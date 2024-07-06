@@ -29,7 +29,7 @@ public static class SteamParser
 
         throw new InvalidOperationException();
 
-        void DieFatally(Exception e)
+        static void DieFatally(Exception e)
         {
             Logger.Fatal(e, "We're unable to find your game's working folder (the folder above the cache), " +
                             "please provide it manually in appsettings.json as 'WorkingFolder'.");

@@ -56,7 +56,7 @@ public static class Settings
             settingsV2.MaxIndexerThreads = settingsV1.MaxIndexerThreads ?? 16;
             settingsV2.MaxPatchThreads = settingsV1.MaxPatchThreads ?? 16;
 
-            var jsonObject = JsonObject.Parse(File.ReadAllText("appsettings.json"));
+            var jsonObject = JsonObject.Parse(File.ReadAllText("appsettings.json")) ?? new JsonObject();
             jsonObject["Settings"] = JsonNode.Parse(JsonSerializer.Serialize(settingsV2));
             File.WriteAllText("appsettings.json",
                 jsonObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));

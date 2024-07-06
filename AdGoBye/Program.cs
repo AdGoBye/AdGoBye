@@ -9,58 +9,73 @@ using Serilog.Events;
 using Serilog.Templates;
 using Serilog.Templates.Themes;
 
-var levelSwitch = new LoggingLevelSwitch
+internal class Program
 {
-    MinimumLevel = (LogEventLevel)Settings.Options.LogLevel
-};
+    private static async Task Main(string[] args)
+    {
+#if !DEBUG // Only attach to unhandled exceptions in release mode, this can be annoying in debug mode.
+        AppDomain.CurrentDomain.UnhandledException += (object sender, UnhandledExceptionEventArgs e) =>
+        {
+            Log.Logger.Error(e.ExceptionObject as Exception, "Unhandled Error occured. Please report this.");
+            Log.Logger.Information("Press [ENTER] to exit.");
+            Console.ReadLine();
+        };
+#endif
 
-Console.OutputEncoding = System.Text.Encoding.UTF8;
+        var levelSwitch = new LoggingLevelSwitch
+        {
+            MinimumLevel = (LogEventLevel)Settings.Options.LogLevel
+        };
 
-Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
-    .WriteTo.Console(new ExpressionTemplate(
-        "[{@t:HH:mm:ss} {@l:u3} {Coalesce(Substring(SourceContext, LastIndexOf(SourceContext, '.') + 1),'<none>')}] {@m}\n{@x}",
-        theme: TemplateTheme.Literate))
-    .CreateLogger();
-var logger = Log.ForContext(typeof(Program));
-SingleInstance.Attach();
-if (Settings.Options.EnableUpdateCheck) Updater.CheckUpdates();
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-await using var db = new AdGoByeContext();
-db.Database.Migrate();
-Blocklist.UpdateNetworkBlocklists();
-Blocklist.ParseAllBlocklists();
-Indexer.ManageIndex();
+        Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
+            .WriteTo.Console(new ExpressionTemplate(
+                "[{@t:HH:mm:ss} {@l:u3} {Coalesce(Substring(SourceContext, LastIndexOf(SourceContext, '.') + 1),'<none>')}] {@m}\n{@x}",
+                theme: TemplateTheme.Literate))
+            .CreateLogger();
+        var logger = Log.ForContext(typeof(Program));
 
-PluginLoader.LoadPlugins();
-foreach (var plugin in PluginLoader.LoadedPlugins)
-{
-    logger.Information("Plugin {Name} ({Maintainer}) v{Version} is loaded.", plugin.Name, plugin.Maintainer,
-        plugin.Version);
-    logger.Information("Plugin type: {Type}", plugin.Instance.PluginType());
+        SingleInstance.Attach();
 
-    if (plugin.Instance.PluginType() == EPluginType.ContentSpecific)
-        logger.Information("Responsible for {IDs}", plugin.Instance.ResponsibleForContentIds());
+        if (Settings.Options.EnableUpdateCheck) Updater.CheckUpdates();
+
+        await using var db = new AdGoByeContext();
+        db.Database.Migrate();
+        Blocklist.UpdateNetworkBlocklists();
+        Blocklist.ParseAllBlocklists();
+        Indexer.ManageIndex();
+
+        PluginLoader.LoadPlugins();
+        foreach (var plugin in PluginLoader.LoadedPlugins)
+        {
+            logger.Information("Plugin {Name} ({Maintainer}) v{Version} is loaded.", plugin.Name, plugin.Maintainer,
+                plugin.Version);
+            logger.Information("Plugin type: {Type}", plugin.Instance.PluginType());
+
+            if (plugin.Instance.PluginType() == EPluginType.ContentSpecific)
+                logger.Information("Responsible for {IDs}", plugin.Instance.ResponsibleForContentIds());
+        }
+
+        if (Blocklist.Blocks == null || Blocklist.Blocks.Count == 0)
+            logger.Information("No blocklist has been loaded, is this intentional?");
+        logger.Information("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
+            Blocklist.Blocks?.Count, db.Content.Count());
+
+        Parallel.ForEach(db.Content.Include(content => content.VersionMeta),
+            new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxPatchThreads }, content =>
+            {
+                if (content.Type != ContentType.World) return;
+                Patcher.PatchContent(content);
+            });
+
+        db.SaveChanges();
+
+        if (Settings.Options.EnableLive)
+        {
+            _ = Task.Run(() => Live.WatchNewContent(Indexer.WorkingDirectory));
+            _ = Task.Run(() => Live.WatchLogFile(Indexer.WorkingDirectory));
+            await Task.Delay(Timeout.Infinite).ConfigureAwait(false);
+        }
+    }
 }
-
-if (Blocklist.Blocks == null || Blocklist.Blocks.Count == 0)
-    logger.Information("No blocklist has been loaded, is this intentional?");
-logger.Information("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
-    Blocklist.Blocks?.Count, db.Content.Count());
-
-Parallel.ForEach(db.Content.Include(content => content.VersionMeta),
-    new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxPatchThreads }, content =>
-{
-    if (content.Type != ContentType.World) return;
-    Patcher.PatchContent(content);
-});
-
-db.SaveChanges();
-
-#pragma warning disable CS4014
-if (Settings.Options.EnableLive)
-{
-    Task.Run(() => Live.WatchNewContent(Indexer.WorkingDirectory));
-    Task.Run(() => Live.WatchLogFile(Indexer.WorkingDirectory));
-    await Task.Delay(Timeout.Infinite).ConfigureAwait(false);
-}
-#pragma warning restore CS4014

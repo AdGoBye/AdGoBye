@@ -80,7 +80,7 @@ namespace AdGoBye
                 {
                     try
                     {
-                        if (Blocklist.Patch(content, container, block.Value.ToArray()))
+                        if (Blocklist.Patch(content, container, [.. block.Value]))
                             someoneModifiedBundle = true;
                     }
                     catch (Exception e)
@@ -147,7 +147,7 @@ namespace AdGoBye
             File.Replace(file + ".clean", file, Settings.Options.Patcher.DisableBackupFile ? null : file + ".bak");
 
             if (!Settings.Options.Patcher.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
-            foreach(var plugin in pluginsDidPatch)
+            foreach (var plugin in pluginsDidPatch)
             {
                 try
                 {
