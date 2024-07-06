@@ -9,6 +9,19 @@ using Serilog.Events;
 using Serilog.Templates;
 using Serilog.Templates.Themes;
 
+internal class Program
+{
+    private static async Task Main(string[] args)
+    {
+#if !DEBUG // Only attach to unhandled exceptions in release mode, this can be annoying in debug mode.
+        AppDomain.CurrentDomain.UnhandledException += (object sender, UnhandledExceptionEventArgs e) =>
+        {
+            Log.Logger.Error(e.ExceptionObject as Exception, "Unhandled Error occured. Please report this.");
+            Log.Logger.Information("Press [ENTER] to exit.");
+            Console.ReadLine();
+        };
+#endif
+
 var levelSwitch = new LoggingLevelSwitch
 {
     MinimumLevel = (LogEventLevel)Settings.Options.LogLevel
@@ -63,4 +76,5 @@ if (Settings.Options.EnableLive)
     Task.Run(() => Live.WatchLogFile(Indexer.WorkingDirectory));
     await Task.Delay(Timeout.Infinite).ConfigureAwait(false);
 }
-#pragma warning restore CS4014
+    }
+}
