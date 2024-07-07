@@ -28,7 +28,6 @@ internal class Program
 
             if (e.IsTerminating)
             {
-
                 if (_isLoggerSet)
                 {
                     Log.Logger.Information("Press [ENTER] to exit.");
