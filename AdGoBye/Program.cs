@@ -11,29 +11,54 @@ using Serilog.Templates.Themes;
 
 internal class Program
 {
+    private static bool _isLoggerSet = false;
+
     private static async Task Main(string[] args)
     {
-#if !DEBUG // Only attach to unhandled exceptions in release mode, this can be annoying in debug mode.
         AppDomain.CurrentDomain.UnhandledException += (object sender, UnhandledExceptionEventArgs e) =>
         {
-            Log.Logger.Error(e.ExceptionObject as Exception, "Unhandled Error occured. Please report this.");
-            Log.Logger.Information("Press [ENTER] to exit.");
-            Console.ReadLine();
-        };
+            if (_isLoggerSet)
+            {
+                Log.Logger.Error(e.ExceptionObject as Exception, "Unhandled Error occured. Please report this.");
+            }
+            else
+            {
+                Console.Error.WriteLine($"Unhandled Error occured. Please report this.{Environment.NewLine}{e.ExceptionObject as Exception}");
+            }
+
+            if (e.IsTerminating)
+            {
+
+                if (_isLoggerSet)
+                {
+                    Log.Logger.Information("Press [ENTER] to exit.");
+                }
+                else
+                {
+                    Console.WriteLine("Press [ENTER] to exit.");
+                }
+
+#if !DEBUG // Only block terminating unhandled exceptions in release mode, this can be annoying in debug mode.
+                Console.ReadLine();
 #endif
+            }
+        };
+
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
 
         var levelSwitch = new LoggingLevelSwitch
         {
             MinimumLevel = (LogEventLevel)Settings.Options.LogLevel
         };
 
-        Console.OutputEncoding = System.Text.Encoding.UTF8;
-
         Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
             .WriteTo.Console(new ExpressionTemplate(
                 "[{@t:HH:mm:ss} {@l:u3} {Coalesce(Substring(SourceContext, LastIndexOf(SourceContext, '.') + 1),'<none>')}] {@m}\n{@x}",
                 theme: TemplateTheme.Literate))
             .CreateLogger();
+
+        _isLoggerSet = true;
+
         var logger = Log.ForContext(typeof(Program));
 
         SingleInstance.Attach();
