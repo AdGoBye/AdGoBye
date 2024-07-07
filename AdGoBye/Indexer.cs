@@ -232,10 +232,17 @@ public class Indexer
 
             foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoScript))
             {
-                var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
-                if (monoScriptBase["m_ClassName"].IsDummy ||
-                    monoScriptBase["m_ClassName"].AsString != "Impostor") continue;
-                return true;
+                try
+                {
+                    var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
+                    if (monoScriptBase["m_ClassName"].IsDummy ||
+                        monoScriptBase["m_ClassName"].AsString != "Impostor") continue;
+                    return true;
+                }
+                catch (Exception e)
+                {
+                    Logger.Warning(e, "Failed to get base field of monobehaviour {pathId}", monoScript.PathId);
+                }
             }
 
             return false;
@@ -260,9 +267,16 @@ public class Indexer
 
             foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoBehaviour))
             {
-                var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
-                if (monoScriptBase["unityVersion"].IsDummy) continue;
-                return monoScriptBase["unityVersion"].AsString;
+                try
+                {
+                    var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
+                    if (monoScriptBase["unityVersion"].IsDummy) continue;
+                    return monoScriptBase["unityVersion"].AsString;
+                }
+                catch (Exception e)
+                {
+                    Logger.Warning(e, "Failed to get base field of monobehaviour {pathId}", monoScript.PathId);
+                }
             }
 
             Logger.Fatal("ResolveUnityVersion: Unable to parse unityVersion out for {path}", path);
@@ -385,13 +399,21 @@ public class Indexer
             return null;
         }
 
-        var assetFile = assetInstance.file;
-
-        foreach (var gameObjectBase in assetFile.GetAssetsOfType(AssetClassID.MonoBehaviour)
-                     .Select(gameObjectInfo => manager.GetBaseField(assetInstance, gameObjectInfo)).Where(
-                         gameObjectBase =>
-                             !gameObjectBase["blueprintId"].IsDummy && !gameObjectBase["contentType"].IsDummy))
+        foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoBehaviour))
         {
+            AssetsTools.NET.AssetTypeValueField gameObjectBase;
+
+            try
+            {
+                gameObjectBase = manager.GetBaseField(assetInstance, monoScript);
+                if (gameObjectBase["blueprintId"].IsDummy || gameObjectBase["contentType"].IsDummy) continue;
+            }
+            catch (Exception e)
+            {
+                Logger.Warning(e, "Failed to get base field of monobehaviour {pathId}", monoScript.PathId);
+                continue;
+            }
+
             if (gameObjectBase["blueprintId"].AsString == "")
             {
                 Logger.Warning("{directory} has no embedded ID for some reason, skipping this…", path);
