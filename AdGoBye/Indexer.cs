@@ -37,13 +37,15 @@ public class Indexer
                 // print exception with exception message if it's the last retry
                 if (retry == maxRetries - 1)
                 {
-                    Logger.Fatal(ex, "Max retries reached. Unable to find your game's Cache directory, please define the folder above manually in appsettings.json as 'WorkingFolder'.");
+                    Logger.Fatal(ex,
+                        "Max retries reached. Unable to find your game's Cache directory, please define the folder above manually in appsettings.json as 'WorkingFolder'.");
                     Environment.Exit(1);
                 }
                 else
                 {
                     Logger.Error($"Directory not found attempting retry: {retry + 1} of {maxRetries}");
                 }
+
                 Thread.Sleep(delayMilliseconds);
             }
         }
@@ -121,10 +123,11 @@ public class Indexer
     public static void AddToIndex(IEnumerable<DirectoryInfo?> paths)
     {
         var dbActionsContainer = new DatabaseOperationsContainer();
-        Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxIndexerThreads }, path =>
-        {
-            if (path != null) AddToIndexPart1(path.FullName, ref dbActionsContainer);
-        });
+        Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxIndexerThreads },
+            path =>
+            {
+                if (path != null) AddToIndexPart1(path.FullName, ref dbActionsContainer);
+            });
 
         var groupedById = dbActionsContainer.AddContent.GroupBy(content => content.Id);
         Parallel.ForEach(groupedById, group =>
@@ -241,7 +244,8 @@ public class Indexer
                 }
                 catch (Exception e)
                 {
-                    Logger.Warning(e, "Failed to get base field of monobehaviour {pathId}", monoScript.PathId);
+                    Logger.Warning(e, "AssetsTools likely failed to deserialize MonoBehaviour (PathId: {id}): ",
+                        monoScript.PathId);
                 }
             }
 
@@ -275,7 +279,8 @@ public class Indexer
                 }
                 catch (Exception e)
                 {
-                    Logger.Warning(e, "Failed to get base field of monobehaviour {pathId}", monoScript.PathId);
+                    Logger.Warning(e, "AssetsTools likely failed to deserialize MonoBehaviour (PathId: {id}): ",
+                        monoScript.PathId);
                 }
             }
 
@@ -410,7 +415,8 @@ public class Indexer
             }
             catch (Exception e)
             {
-                Logger.Warning(e, "Failed to get base field of monobehaviour {pathId}", monoScript.PathId);
+                Logger.Warning(e, "AssetsTools likely failed to deserialize MonoBehaviour (PathId: {id}): ",
+                    monoScript.PathId);
                 continue;
             }
 
@@ -455,7 +461,8 @@ public class Indexer
     [SuppressMessage("ReSharper", "StringLiteralTypo")]
     private static string GetWorkingDirectory()
     {
-        if (!string.IsNullOrEmpty(Settings.Options.Indexer.WorkingFolder)) return Settings.Options.Indexer.WorkingFolder;
+        if (!string.IsNullOrEmpty(Settings.Options.Indexer.WorkingFolder))
+            return Settings.Options.Indexer.WorkingFolder;
         var appName = SteamParser.GetApplicationName();
         var pathToWorkingDir = $"{appName}/{appName}/";
 
