@@ -11,36 +11,25 @@ using Serilog.Templates.Themes;
 
 internal class Program
 {
-    private static bool _isLoggerSet = false;
+    private static bool _isLoggerSet;
 
-    private static async Task Main(string[] args)
+    private static async Task Main()
     {
-        AppDomain.CurrentDomain.UnhandledException += (object sender, UnhandledExceptionEventArgs e) =>
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
             if (_isLoggerSet)
-            {
                 Log.Logger.Error(e.ExceptionObject as Exception, "Unhandled Error occured. Please report this.");
-            }
             else
-            {
-                Console.Error.WriteLine($"Unhandled Error occured. Please report this.{Environment.NewLine}{e.ExceptionObject as Exception}");
-            }
+                Console.Error.WriteLine(
+                    $"Unhandled Error occured. Please report this.{Environment.NewLine}{e.ExceptionObject as Exception}");
 
-            if (e.IsTerminating)
-            {
-                if (_isLoggerSet)
-                {
-                    Log.Logger.Information("Press [ENTER] to exit.");
-                }
-                else
-                {
-                    Console.WriteLine("Press [ENTER] to exit.");
-                }
+            if (!e.IsTerminating) return;
+            if (_isLoggerSet) Log.Logger.Information("Press [ENTER] to exit.");
+            else Console.WriteLine("Press [ENTER] to exit.");
 
 #if !DEBUG // Only block terminating unhandled exceptions in release mode, this can be annoying in debug mode.
-                Console.ReadLine();
+            Console.ReadLine();
 #endif
-            }
         };
 
         Console.OutputEncoding = System.Text.Encoding.UTF8;
