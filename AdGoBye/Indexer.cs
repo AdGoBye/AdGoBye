@@ -37,13 +37,15 @@ public class Indexer
                 // print exception with exception message if it's the last retry
                 if (retry == maxRetries - 1)
                 {
-                    Logger.Fatal(ex, "Max retries reached. Unable to find your game's Cache directory, please define the folder above manually in appsettings.json as 'WorkingFolder'.");
+                    Logger.Fatal(ex,
+                        "Max retries reached. Unable to find your game's Cache directory, please define the folder above manually in appsettings.json as 'WorkingFolder'.");
                     Environment.Exit(1);
                 }
                 else
                 {
                     Logger.Error($"Directory not found attempting retry: {retry + 1} of {maxRetries}");
                 }
+
                 Thread.Sleep(delayMilliseconds);
             }
         }
@@ -121,10 +123,11 @@ public class Indexer
     public static void AddToIndex(IEnumerable<DirectoryInfo?> paths)
     {
         var dbActionsContainer = new DatabaseOperationsContainer();
-        Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxIndexerThreads }, path =>
-        {
-            if (path != null) AddToIndexPart1(path.FullName, ref dbActionsContainer);
-        });
+        Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxIndexerThreads },
+            path =>
+            {
+                if (path != null) AddToIndexPart1(path.FullName, ref dbActionsContainer);
+            });
 
         var groupedById = dbActionsContainer.AddContent.GroupBy(content => content.Id);
         Parallel.ForEach(groupedById, group =>
@@ -232,10 +235,18 @@ public class Indexer
 
             foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoScript))
             {
-                var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
-                if (monoScriptBase["m_ClassName"].IsDummy ||
-                    monoScriptBase["m_ClassName"].AsString != "Impostor") continue;
-                return true;
+                try
+                {
+                    var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
+                    if (monoScriptBase["m_ClassName"].IsDummy ||
+                        monoScriptBase["m_ClassName"].AsString != "Impostor") continue;
+                    return true;
+                }
+                catch (Exception e)
+                {
+                    Logger.Warning(e, "AssetsTools likely failed to deserialize MonoBehaviour (PathId: {id}): ",
+                        monoScript.PathId);
+                }
             }
 
             return false;
@@ -260,9 +271,17 @@ public class Indexer
 
             foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoBehaviour))
             {
-                var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
-                if (monoScriptBase["unityVersion"].IsDummy) continue;
-                return monoScriptBase["unityVersion"].AsString;
+                try
+                {
+                    var monoScriptBase = manager.GetBaseField(assetInstance, monoScript);
+                    if (monoScriptBase["unityVersion"].IsDummy) continue;
+                    return monoScriptBase["unityVersion"].AsString;
+                }
+                catch (Exception e)
+                {
+                    Logger.Warning(e, "AssetsTools likely failed to deserialize MonoBehaviour (PathId: {id}): ",
+                        monoScript.PathId);
+                }
             }
 
             Logger.Fatal("ResolveUnityVersion: Unable to parse unityVersion out for {path}", path);
@@ -385,13 +404,22 @@ public class Indexer
             return null;
         }
 
-        var assetFile = assetInstance.file;
-
-        foreach (var gameObjectBase in assetFile.GetAssetsOfType(AssetClassID.MonoBehaviour)
-                     .Select(gameObjectInfo => manager.GetBaseField(assetInstance, gameObjectInfo)).Where(
-                         gameObjectBase =>
-                             !gameObjectBase["blueprintId"].IsDummy && !gameObjectBase["contentType"].IsDummy))
+        foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoBehaviour))
         {
+            AssetsTools.NET.AssetTypeValueField gameObjectBase;
+
+            try
+            {
+                gameObjectBase = manager.GetBaseField(assetInstance, monoScript);
+                if (gameObjectBase["blueprintId"].IsDummy || gameObjectBase["contentType"].IsDummy) continue;
+            }
+            catch (Exception e)
+            {
+                Logger.Warning(e, "AssetsTools likely failed to deserialize MonoBehaviour (PathId: {id}): ",
+                    monoScript.PathId);
+                continue;
+            }
+
             if (gameObjectBase["blueprintId"].AsString == "")
             {
                 Logger.Warning("{directory} has no embedded ID for some reason, skipping this…", path);
@@ -433,7 +461,8 @@ public class Indexer
     [SuppressMessage("ReSharper", "StringLiteralTypo")]
     private static string GetWorkingDirectory()
     {
-        if (!string.IsNullOrEmpty(Settings.Options.Indexer.WorkingFolder)) return Settings.Options.Indexer.WorkingFolder;
+        if (!string.IsNullOrEmpty(Settings.Options.Indexer.WorkingFolder))
+            return Settings.Options.Indexer.WorkingFolder;
         var appName = SteamParser.GetApplicationName();
         var pathToWorkingDir = $"{appName}/{appName}/";
 
