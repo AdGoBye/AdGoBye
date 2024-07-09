@@ -18,16 +18,20 @@ internal class Program
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
             if (_isLoggerSet)
-                Log.Logger.Error(e.ExceptionObject as Exception, "Unhandled Error occured. Please report this.");
+                Log.Logger.Error(e.ExceptionObject as Exception,
+                    "Unhandled Error occured (isTerminating: {isTerminating}). Please report this.",
+                    e.IsTerminating);
             else
                 Console.Error.WriteLine(
-                    $"Unhandled Error occured. Please report this.{Environment.NewLine}{e.ExceptionObject as Exception}");
+                    $"Unhandled Error occured (isTerminating: {e.IsTerminating})." +
+                    $" Please report this.{Environment.NewLine}{e.ExceptionObject as Exception}");
 
             if (!e.IsTerminating) return;
+#if !DEBUG // Only block terminating unhandled exceptions in release mode, this can be annoying in debug mode.
             if (_isLoggerSet) Log.Logger.Information("Press [ENTER] to exit.");
             else Console.WriteLine("Press [ENTER] to exit.");
 
-#if !DEBUG // Only block terminating unhandled exceptions in release mode, this can be annoying in debug mode.
+
             Console.ReadLine();
 #endif
         };
