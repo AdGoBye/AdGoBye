@@ -104,7 +104,7 @@ public class Indexer
                 continue;
             }
 
-            if (highestVersion <= content.VersionMeta.Version) continue;
+            if (highestVersion <= content.VersionMeta.Version && Directory.Exists(content.VersionMeta.Path)) continue;
             content.VersionMeta.Version = highestVersion;
             content.VersionMeta.Path = highestVersionDir.FullName;
             content.VersionMeta.PatchedBy = [];
