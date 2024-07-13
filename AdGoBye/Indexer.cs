@@ -411,8 +411,7 @@ public class Indexer
             try
             {
                 gameObjectBase = manager.GetBaseField(assetInstance, monoScript);
-                if (gameObjectBase["blueprintId"].IsDummy ||
-                    gameObjectBase["assetBundleUnityVersion"].IsDummy) continue;
+                if (gameObjectBase["blueprintId"].IsDummy || gameObjectBase["contentType"].IsDummy) continue;
             }
             catch (Exception e)
             {
