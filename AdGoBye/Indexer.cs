@@ -55,8 +55,8 @@ public class Indexer
         var content = contentFolders
             .ExceptBy(db.Content.Select(content => content.StableContentName), info => info.Name)
             .Select(newContent => GetLatestFileVersion(newContent).HighestVersionDirectory)
-            .Where(directory => directory != null).ToList();
-        ;
+            // If we do a conditional check against null, the type checker thinks it's still null  
+            .OfType<DirectoryInfo>().ToList();
 
         if (content.Count != 0) AddToIndex(content);
 
