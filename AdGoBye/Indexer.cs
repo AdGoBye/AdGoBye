@@ -55,12 +55,10 @@ public class Indexer
         var content = contentFolders
             .ExceptBy(db.Content.Select(content => content.StableContentName), info => info.Name)
             .Select(newContent => GetLatestFileVersion(newContent).HighestVersionDirectory)
-            .Where(directory => directory != null);
+            .Where(directory => directory != null).ToList();
+        ;
 
-        if (content != null)
-        {
-            AddToIndex(content);
-        }
+        if (content.Count != 0) AddToIndex(content);
 
         Logger.Information("Finished Index processing");
         return;
@@ -115,35 +113,19 @@ public class Indexer
     public static void AddToIndex(string path)
     {
         var container = new DatabaseOperationsContainer();
-        AddToIndexPart1(path, ref container);
-        if (!container.AddContent.IsEmpty) AddToIndexPart2(container.AddContent.First(), ref container);
+        AddToIndex(path, ref container);
         CommitToDatabase(container);
     }
 
-    public static void AddToIndex(IEnumerable<DirectoryInfo?> paths)
+    public static void AddToIndex(IEnumerable<DirectoryInfo> paths)
     {
         var dbActionsContainer = new DatabaseOperationsContainer();
         Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxIndexerThreads },
-            path =>
-            {
-                if (path != null) AddToIndexPart1(path.FullName, ref dbActionsContainer);
-            });
-
-        var groupedById = dbActionsContainer.AddContent.GroupBy(content => content.Id);
-        Parallel.ForEach(groupedById, group =>
-        {
-            {
-                foreach (var content in group)
-                {
-                    AddToIndexPart2(content, ref dbActionsContainer);
-                }
-            }
-        });
-
+            path => AddToIndex(path.FullName, ref dbActionsContainer));
         CommitToDatabase(dbActionsContainer);
     }
 
-    public static void AddToIndexPart1(string path, ref DatabaseOperationsContainer container)
+    private static void AddToIndex(string path, ref DatabaseOperationsContainer container)
     {
         using var db = new AdGoByeContext();
         //   - Folder (StableContentName) [singleton, we want this]
@@ -177,12 +159,8 @@ public class Indexer
 
         if (!File.Exists(directory!.FullName + "/__data")) return;
         content = FileToContent(directory);
-        if (content is not null) container.AddContent.Add(content);
-    }
+        if (content is null) return;
 
-    private static void AddToIndexPart2(Content content, ref DatabaseOperationsContainer container)
-    {
-        using var db = new AdGoByeContext();
         var indexCopy = db.Content.Include(existingFile => existingFile.VersionMeta)
             .FirstOrDefault(existingFile => existingFile.Id == content.Id);
 
