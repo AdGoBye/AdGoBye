@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using AdGoBye.Database;
 using AssetsTools.NET.Extra;
 using Microsoft.EntityFrameworkCore;
@@ -442,13 +444,18 @@ public class Indexer
         if (!string.IsNullOrEmpty(Settings.Options.Indexer.WorkingFolder))
             return Settings.Options.Indexer.WorkingFolder;
         var appName = SteamParser.GetApplicationName();
-        var pathToWorkingDir = $"{appName}/{appName}/";
-
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return ConstructLinuxWorkingPath();
-
         var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
             .Replace("Roaming", "LocalLow");
-        return $"{appDataFolder}/{pathToWorkingDir}";
+        var pathToWorkingDir = $@"{appName}\{appName}\";
+        var defaultWorkingDir = Path.Combine(appDataFolder, pathToWorkingDir);
+        var customWorkingDir = ReadConfigFile(defaultWorkingDir);
+        if (!string.IsNullOrEmpty(customWorkingDir))
+            return customWorkingDir;
+        
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return ConstructLinuxWorkingPath();
+
+        return defaultWorkingDir;
 
         [SupportedOSPlatform("linux")]
         string ConstructLinuxWorkingPath()
@@ -463,10 +470,31 @@ public class Indexer
         }
     }
 
+    private static string? ReadConfigFile(string path)
+    {
+        var configFile = Path.Combine(path, "config.json");
+        if (!File.Exists(configFile))
+            return null;
+
+        var json = File.ReadAllText(configFile);
+        if (string.IsNullOrEmpty(json))
+            return null;
+
+        try
+        {
+            var jsonObject = JsonSerializer.Deserialize<JsonObject>(json);
+            return jsonObject?["cache_directory"]?.ToString();
+        }
+        catch (JsonException e)
+        {
+            Logger.Error(e, "Failed to parse config.json");
+            return null;
+        }
+    }
 
     private static string GetCacheDir()
     {
-        return WorkingDirectory + "/Cache-WindowsPlayer/";
+        return Path.Combine(WorkingDirectory, "Cache-WindowsPlayer");
     }
 
     public record DatabaseOperationsContainer
