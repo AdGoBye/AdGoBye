@@ -88,14 +88,12 @@ internal class Program
         builder.Services.AddSingleton<Patcher>();
         builder.Services.AddSingleton<PluginLoader>();
         var host = builder.Build();
-
-
+        SingleInstance.Attach();
 
         var logger = host.Services.GetRequiredService<ILogger<Program>>();
         var blocklists = host.Services.GetRequiredService<Blocklist>();
         var patcher = host.Services.GetRequiredService<Patcher>();
         var globalOptions = host.Services.GetRequiredService<IOptions<Settings.SettingsOptionsV2>>().Value;
-        SingleInstance.Attach();
 
         if (globalOptions.EnableUpdateCheck) Updater.CheckUpdates();
 
