@@ -102,11 +102,8 @@ internal class Program
         await using var db = new AdGoByeContext();
         await db.Database.MigrateAsync();
 
-        if (blocklists.Blocks == null || blocklists.Blocks.Count == 0)
-            logger.LogInformation("No blocklist has been loaded, is this intentional?");
-
         logger.LogInformation("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
-            blocklists.Blocks?.Count, db.Content.Count());
+            blocklists.Blocks.Count, db.Content.Count());
 
         Parallel.ForEach(db.Content.Include(content => content.VersionMeta),
             new ParallelOptions

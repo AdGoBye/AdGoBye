@@ -22,7 +22,7 @@ public class Blocklist
 {
     private readonly ILogger<Blocklist> _logger;
     private readonly Settings.BlocklistOptions _options;
-    public Dictionary<string, HashSet<GameObjectInstance>>? Blocks;
+    public required Dictionary<string, HashSet<GameObjectInstance>> Blocks;
 
     public Blocklist(ILogger<Blocklist> logger, IOptions<Settings.BlocklistOptions> options)
     {
@@ -30,6 +30,8 @@ public class Blocklist
         _options = options.Value;
         UpdateNetworkBlocklists();
         Blocks = BlocklistsParser(GetBlocklists());
+        if (Blocks.Count == 0) logger.LogInformation("No blocklist has been loaded, is this intentional?");
+        ;
     }
 
 
