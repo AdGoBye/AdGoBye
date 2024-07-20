@@ -57,12 +57,17 @@ internal class Program
         );
         builder.Services.RegisterLiveServices();
         builder.Services.AddSingleton<Indexer>();
+        builder.Services.AddSingleton<Blocklist>();
+        builder.Services.AddSingleton<Patcher>();
+
         _isLogSet = true;
         var host = builder.Build();
 
 
 
         var logger = host.Services.GetRequiredService<ILogger<Program>>();
+        var blocklists = host.Services.GetRequiredService<Blocklist>();
+        var patcher = host.Services.GetRequiredService<Patcher>();
 
         SingleInstance.Attach();
 
@@ -70,8 +75,6 @@ internal class Program
 
         await using var db = new AdGoByeContext();
         await db.Database.MigrateAsync();
-        Blocklist.UpdateNetworkBlocklists();
-        Blocklist.ParseAllBlocklists();
 
         PluginLoader.LoadPlugins();
         foreach (var plugin in PluginLoader.LoadedPlugins)
@@ -84,10 +87,11 @@ internal class Program
                 logger.LogInformation("Responsible for {IDs}", plugin.Instance.ResponsibleForContentIds());
         }
 
-        if (Blocklist.Blocks == null || Blocklist.Blocks.Count == 0)
+        if (blocklists.Blocks == null || blocklists.Blocks.Count == 0)
             logger.LogInformation("No blocklist has been loaded, is this intentional?");
+
         logger.LogInformation("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
-            Blocklist.Blocks?.Count, db.Content.Count());
+            blocklists.Blocks?.Count, db.Content.Count());
 
         Parallel.ForEach(db.Content.Include(content => content.VersionMeta),
             new ParallelOptions
@@ -96,7 +100,7 @@ internal class Program
             }, content =>
             {
                 if (content.Type != ContentType.World) return;
-                Patcher.PatchContent(content);
+                patcher.PatchContent(content);
             });
 
         await db.SaveChangesAsync();

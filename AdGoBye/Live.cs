@@ -20,7 +20,7 @@ public static class Live
         services.AddHostedService<ContentWatcher>();
     }
 
-    internal class ContentWatcher(ILogger<ContentWatcher> logger, Indexer indexer) : BackgroundService
+    internal class ContentWatcher(ILogger<ContentWatcher> logger, Indexer indexer, Patcher patcher) : BackgroundService
     {
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -87,7 +87,7 @@ public static class Live
                     indexer.AddToIndex(path);
                     Ewh.WaitOne();
                     var newContent = Indexer.GetFromIndex(path);
-                    if (newContent is not null) Patcher.PatchContent(newContent);
+                    if (newContent is not null) patcher.PatchContent(newContent);
                     done = true;
                 }
                 catch (EndOfStreamException)

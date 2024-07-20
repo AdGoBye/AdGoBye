@@ -10,17 +10,25 @@ using System.Text.Json.Serialization;
 using AdGoBye.Database;
 using AssetsTools.NET;
 using AssetsTools.NET.Extra;
-using Serilog;
+using Microsoft.Extensions.Logging;
 using Tomlyn;
 
 namespace AdGoBye;
 
 // The auto properties are implicitly used by Tomlyn, removing them breaks parsing.
 [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
-public static class Blocklist
+public class Blocklist
 {
-    public static Dictionary<string, HashSet<GameObjectInstance>>? Blocks;
-    private static readonly ILogger Logger = Log.ForContext(typeof(Blocklist));
+    private readonly ILogger<Blocklist> _logger;
+    public Dictionary<string, HashSet<GameObjectInstance>>? Blocks;
+
+    public Blocklist(ILogger<Blocklist> logger)
+    {
+        _logger = logger;
+        UpdateNetworkBlocklists();
+        Blocks = BlocklistsParser(GetBlocklists());
+    }
+
 
     public class BlocklistModel
     {
@@ -67,19 +75,14 @@ public static class Blocklist
         // ReSharper enable EntityFramework.ModelValidation.UnlimitedStringLength
     }
 
-    public static void ParseAllBlocklists()
-    {
-        Blocks = BlocklistsParser(GetBlocklists());
-    }
-
-    public static void UpdateNetworkBlocklists()
+    public void UpdateNetworkBlocklists()
     {
         using var db = new AdGoByeContext();
         var blocklistEntries = db.NetworkBlocklists;
         foreach (var danglingBlocklist in blocklistEntries.Where(blocklist =>
                      Settings.Options.Blocklist.BlocklistUrls.All(url => url != blocklist.Url)))
         {
-            Logger.Information("Removing dangling blocklist for {url}", danglingBlocklist.Url);
+            _logger.LogInformation("Removing dangling blocklist for {url}", danglingBlocklist.Url);
             blocklistEntries.RemoveRange(danglingBlocklist);
         }
 
@@ -105,7 +108,7 @@ public static class Blocklist
                     ETag = blocklistDownload.Value.ETag
                 };
                 blocklistEntries.Add(networkBlocklistElement);
-                Logger.Information("Added network blocklist for {url}", optionsUrl);
+                _logger.LogInformation("Added network blocklist for {url}", optionsUrl);
             }
             else
             {
@@ -118,7 +121,7 @@ public static class Blocklist
     }
 
 
-    private static List<BlocklistModel> GetBlocklists()
+    private List<BlocklistModel> GetBlocklists()
     {
         using var db = new AdGoByeContext();
         var final = new List<BlocklistModel>();
@@ -142,20 +145,20 @@ public static class Blocklist
             try
             {
                 var blocklist = Toml.ToModel<BlocklistModel>(blocklistContent);
-                Logger.Information("Read blocklist: {Name} ({Maintainer})", blocklist.Title,
+                _logger.LogInformation("Read blocklist: {Name} ({Maintainer})", blocklist.Title,
                     blocklist.Maintainer);
                 final.Add(blocklist);
             }
             catch (TomlException exception)
             {
-                Logger.Error("Failed to parse blocklist {location}: {error}", location, exception.Message);
+                _logger.LogError("Failed to parse blocklist {location}: {error}", location, exception.Message);
             }
         }
     }
 
 
     // ReSharper disable once InconsistentNaming
-    private static (string Result, string? ETag)? GetBlocklistFromUrl(string url, string? ETag)
+    private (string Result, string? ETag)? GetBlocklistFromUrl(string url, string? ETag)
     {
         using HttpClient client = new();
         client.DefaultRequestHeaders.Add("User-Agent", "AdGoBye (https://github.com/AdGoBye/AdGoBye)");
@@ -165,13 +168,13 @@ public static class Blocklist
 
         if (result.Result.StatusCode is HttpStatusCode.NotModified)
         {
-            Logger.Verbose("{url} told us the resource has not been modified", url);
+            _logger.LogTrace("{url} told us the resource has not been modified", url);
             return null;
         }
 
         if (!result.Result.IsSuccessStatusCode)
         {
-            Logger.Error("Blocklist fetch for {url} failed! (Status code: {statusCode})", url,
+            _logger.LogError("Blocklist fetch for {url} failed! (Status code: {statusCode})", url,
                 result.Result.StatusCode);
             return null;
         }
@@ -191,7 +194,7 @@ public static class Blocklist
     /// </summary>
     /// <param name="lists"> List of BlocklistModels, although only <c>Blocks</c> is used from it</param>
     /// <returns>Dictionary keyed to World ID string with value of a string Hashset containing GameObjects to be blocked</returns>
-    public static Dictionary<string, HashSet<GameObjectInstance>> BlocklistsParser(List<BlocklistModel>? lists)
+    private Dictionary<string, HashSet<GameObjectInstance>> BlocklistsParser(List<BlocklistModel>? lists)
     {
         lists ??= GetBlocklists();
         var deduplicatedBlocklist = new Dictionary<string, HashSet<GameObjectInstance>>();
@@ -210,7 +213,7 @@ public static class Blocklist
     }
 
 
-    public static bool Patch(Content content, ContentAssetManagerContainer assetContainer,
+    public bool Patch(Content content, ContentAssetManagerContainer assetContainer,
         GameObjectInstance[] gameObjectsToDisable)
     {
         var patchedGameObjects = new List<GameObjectInstance>();
@@ -241,14 +244,14 @@ public static class Blocklist
                     .SetNewData(assetContainer.AssetsFile.file);
                 patchedGameObjects.Add(blocklistGameObject);
                 anyModifications = true;
-                Logger.Debug("Found and disabled {gameObjectName}", blocklistGameObject.Name);
+                _logger.LogDebug("Found and disabled {gameObjectName}", blocklistGameObject.Name);
             }
         }
 
         var unpatchedObjects = gameObjectsToDisable.Except(patchedGameObjects).ToList();
         if (unpatchedObjects.Count != 0)
         {
-            Logger.Warning(
+            _logger.LogWarning(
                 "Following blocklist objects weren't disabled: {@UnpatchedList}" +
                 "\nThis can mean that these blocklist entries are outdated, consider informing the maintainer",
                 unpatchedObjects);
@@ -323,10 +326,10 @@ public static class Blocklist
         };
     }
 
-    public static async void SendUnpatchedObjects(Content content, IEnumerable<GameObjectInstance> unmatchedObjects)
+    public async void SendUnpatchedObjects(Content content, IEnumerable<GameObjectInstance> unmatchedObjects)
     {
         var payload = ConstructUnmatchedPayload(content, unmatchedObjects);
-        Logger.Verbose("Callback Payload: {@payload}", payload);
+        _logger.LogTrace("Callback Payload: {@payload}", payload);
 
         using var client = new HttpClient();
         HttpResponseMessage response;
@@ -336,15 +339,15 @@ public static class Blocklist
         }
         catch (Exception e)
         {
-            Logger.Error("Blocklist callback exception: {e}", e);
+            _logger.LogError("Blocklist callback exception: {e}", e);
             return;
         }
 
         if (response.StatusCode != HttpStatusCode.NoContent)
-            Logger.Warning("Blocklist callback failed:  [{statusCode}] {body}", response.StatusCode,
+            _logger.LogWarning("Blocklist callback failed:  [{statusCode}] {body}", response.StatusCode,
                 await response.Content.ReadAsStringAsync());
         else
-            Logger.Verbose("Blocklist callback response: [{statusCode}] {body}", response.StatusCode,
+            _logger.LogTrace("Blocklist callback response: [{statusCode}] {body}", response.StatusCode,
                 await response.Content.ReadAsStringAsync());
     }
 

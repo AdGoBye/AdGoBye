@@ -5,11 +5,11 @@ using Serilog;
 
 namespace AdGoBye
 {
-    internal class Patcher
+    internal class Patcher(Blocklist blocklists)
     {
         private static readonly ILogger Logger = Log.ForContext(typeof(Patcher));
 
-        internal static void PatchContent(Content content)
+        internal void PatchContent(Content content)
         {
             if (content.Type is not ContentType.World) return;
             Logger.Information("Processing {ID} ({directory})", content.Id, content.VersionMeta.Path);
@@ -73,14 +73,14 @@ namespace AdGoBye
                 }
             }
 
-            if (Blocklist.Blocks is not null && !pluginOverridesBlocklist &&
+            if (blocklists.Blocks is not null && !pluginOverridesBlocklist &&
                 !content.VersionMeta.PatchedBy.Contains("Blocklist"))
             {
-                foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
+                foreach (var block in blocklists.Blocks.Where(block => block.Key.Equals(content.Id)))
                 {
                     try
                     {
-                        if (Blocklist.Patch(content, container, [.. block.Value]))
+                        if (blocklists.Patch(content, container, [.. block.Value]))
                             someoneModifiedBundle = true;
                     }
                     catch (Exception e)
