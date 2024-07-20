@@ -109,11 +109,7 @@ internal class Program
             new ParallelOptions
             {
                 MaxDegreeOfParallelism = globalOptions.MaxPatchThreads
-            }, content =>
-            {
-                if (content.Type != ContentType.World) return;
-                patcher.PatchContent(content);
-            });
+            }, content => { patcher.PatchContent(content); });
 
         await db.SaveChangesAsync();
 
