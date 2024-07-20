@@ -95,6 +95,8 @@ internal class Program
         var patcher = host.Services.GetRequiredService<Patcher>();
         var globalOptions = host.Services.GetRequiredService<IOptions<Settings.SettingsOptionsV2>>().Value;
 
+        await host.StartAsync();
+
         if (globalOptions.EnableUpdateCheck) Updater.CheckUpdates();
 
         await using var db = new AdGoByeContext();
@@ -110,7 +112,7 @@ internal class Program
             }, content => { patcher.PatchContent(content); });
 
         await db.SaveChangesAsync();
-
-        if (globalOptions.EnableLive) host.Run();
+        if (!globalOptions.EnableLive) await host.StopAsync();
+        await host.WaitForShutdownAsync();
     }
 }
