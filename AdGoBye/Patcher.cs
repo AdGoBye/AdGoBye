@@ -1,20 +1,19 @@
 ﻿using AdGoBye.PluginInternal;
 using AdGoBye.Plugins;
 using AssetsTools.NET;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Serilog;
 
 namespace AdGoBye
 {
-    internal class Patcher(Blocklist blocklists, IOptions<Settings.PatcherOptions> options)
+    internal class Patcher(Blocklist blocklists, IOptions<Settings.PatcherOptions> options, ILogger<Patcher> logger)
     {
-        private static readonly ILogger Logger = Log.ForContext(typeof(Patcher));
         private readonly Settings.PatcherOptions _options = options.Value;
 
         internal void PatchContent(Content content)
         {
             if (content.Type is not ContentType.World) return;
-            Logger.Information("Processing {ID} ({directory})", content.Id, content.VersionMeta.Path);
+            logger.LogInformation("Processing {ID} ({directory})", content.Id, content.VersionMeta.Path);
 
             var file = Path.Combine(content.VersionMeta.Path, "__data");
             var container = new ContentAssetManagerContainer(file);
@@ -23,7 +22,7 @@ namespace AdGoBye
 
             if (estimatedUncompressedSize > _options.ZipBombSizeLimitMB * 1000L * 1000L)
             {
-                Logger.Warning("Skipped {ID} ({directory}) because it's likely a ZIP Bomb ({estimatedMB}MB uncompressed).",
+                logger.LogWarning("Skipped {ID} ({directory}) because it's likely a ZIP Bomb ({estimatedMB}MB uncompressed).",
                     content.Id, content.VersionMeta.Path, (estimatedUncompressedSize / 1000 / 1000));
                 return;
             }
@@ -69,7 +68,7 @@ namespace AdGoBye
                 }
                 catch (Exception e)
                 {
-                    Logger.Error(e,
+                    logger.LogError(e,
                         "Plugin {Name} ({Maintainer}) v{Version} threw an exception while patching {ID} ({path})",
                         plugin.Name, plugin.Maintainer, plugin.Version, content.Id, content.VersionMeta.Path);
                 }
@@ -87,7 +86,7 @@ namespace AdGoBye
                     }
                     catch (Exception e)
                     {
-                        Logger.Error(e, "Failed to patch {ID} ({path})", content.Id, content.VersionMeta.Path);
+                        logger.LogError(e, "Failed to patch {ID} ({path})", content.Id, content.VersionMeta.Path);
                     }
                 }
             }
@@ -95,7 +94,7 @@ namespace AdGoBye
             if (_options.DryRun) return;
             if (!someoneModifiedBundle) return;
 
-            Logger.Information("Done, writing changes as bundle");
+            logger.LogInformation("Done, writing changes as bundle");
 
             container.Bundle.file.BlockAndDirInfo.DirectoryInfos[1].SetNewData(container.AssetsFile.file);
             using var writer = new AssetsFileWriter(file + ".clean");
@@ -157,12 +156,12 @@ namespace AdGoBye
                 }
                 catch (Exception e)
                 {
-                    Logger.Error(e,
+                    logger.LogError(e,
                         "Plugin {Name} ({Maintainer}) v{Version} threw an exception while handling post disk write {ID} ({path})",
                         plugin.Name, plugin.Maintainer, plugin.Version, content.Id, content.VersionMeta.Path);
                 }
             }
-            Logger.Information("Processed {ID}", content.Id);
+            logger.LogInformation("Processed {ID}", content.Id);
         }
 
         private static long EstimateDecompressedSize(AssetBundleFile assetBundleFile)
