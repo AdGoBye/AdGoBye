@@ -75,7 +75,7 @@ namespace AdGoBye
                 }
             }
 
-            if (blocklists.Blocks is not null && !pluginOverridesBlocklist &&
+            if (blocklists.Blocks.Count != 0 && !pluginOverridesBlocklist &&
                 !content.VersionMeta.PatchedBy.Contains("Blocklist"))
             {
                 foreach (var block in blocklists.Blocks.Where(block => block.Key.Equals(content.Id)))
