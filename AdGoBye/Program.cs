@@ -42,7 +42,10 @@ internal class Program
 
         Console.OutputEncoding = Encoding.UTF8;
 
-        var levelSwitch = new LoggingLevelSwitch { MinimumLevel = (LogEventLevel)Settings.Options.LogLevel };
+        var levelSwitch = new LoggingLevelSwitch
+        {
+            MinimumLevel = (LogEventLevel)Settings.Options.LogLevel
+        };
 
         var builder = Host.CreateApplicationBuilder();
         builder.Services.AddSerilog((_, configuration) =>
@@ -53,6 +56,7 @@ internal class Program
                 )
         );
         builder.Services.RegisterLiveServices();
+        builder.Services.AddSingleton<Indexer>();
         _isLogSet = true;
         var host = builder.Build();
 
@@ -68,7 +72,6 @@ internal class Program
         await db.Database.MigrateAsync();
         Blocklist.UpdateNetworkBlocklists();
         Blocklist.ParseAllBlocklists();
-        Indexer.ManageIndex();
 
         PluginLoader.LoadPlugins();
         foreach (var plugin in PluginLoader.LoadedPlugins)
@@ -87,7 +90,10 @@ internal class Program
             Blocklist.Blocks?.Count, db.Content.Count());
 
         Parallel.ForEach(db.Content.Include(content => content.VersionMeta),
-            new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxPatchThreads }, content =>
+            new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Settings.Options.MaxPatchThreads
+            }, content =>
             {
                 if (content.Type != ContentType.World) return;
                 Patcher.PatchContent(content);

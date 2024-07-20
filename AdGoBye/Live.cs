@@ -20,13 +20,13 @@ public static class Live
         services.AddHostedService<ContentWatcher>();
     }
 
-    internal class ContentWatcher(ILogger<ContentWatcher> logger) : BackgroundService
+    internal class ContentWatcher(ILogger<ContentWatcher> logger, Indexer indexer) : BackgroundService
     {
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             await Task.Run(() =>
             {
-                using var watcher = new FileSystemWatcher(Indexer.WorkingDirectory);
+                using var watcher = new FileSystemWatcher(indexer.WorkingDirectory);
 
                 watcher.NotifyFilter = NotifyFilters.Attributes
                                        | NotifyFilters.CreationTime
@@ -47,7 +47,7 @@ public static class Live
                     () =>
                     {
                         logger.LogTrace("File removal: {directory}", e.FullPath);
-                        Indexer.RemoveFromIndex(e.FullPath.Replace("__info", "__data"));
+                        indexer.RemoveFromIndex(e.FullPath.Replace("__info", "__data"));
                     });
                 // ReSharper restore MethodSupportsCancellation
 
@@ -77,14 +77,14 @@ public static class Live
             });
         }
 
-        private static async void ParseFile(string path)
+        private async void ParseFile(string path)
         {
             var done = false;
             while (!done)
             {
                 try
                 {
-                    Indexer.AddToIndex(path);
+                    indexer.AddToIndex(path);
                     Ewh.WaitOne();
                     var newContent = Indexer.GetFromIndex(path);
                     if (newContent is not null) Patcher.PatchContent(newContent);
@@ -98,13 +98,13 @@ public static class Live
         }
     }
 
-    internal class LogFileWatcher(ILogger<LogFileWatcher> logger) : BackgroundService
+    internal class LogFileWatcher(ILogger<LogFileWatcher> logger, Indexer indexer) : BackgroundService
     {
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             await Task.Run(() =>
             {
-                using var watcher = new FileSystemWatcher(Indexer.WorkingDirectory);
+                using var watcher = new FileSystemWatcher(indexer.WorkingDirectory);
                 watcher.NotifyFilter = NotifyFilters.FileName;
                 watcher.Filter = "*.txt";
                 watcher.IncludeSubdirectories = false;
@@ -129,7 +129,7 @@ public static class Live
         }
     }
 
-    internal class Logwatcher(ILogger<Logwatcher> logger) : BackgroundService
+    internal class Logwatcher(ILogger<Logwatcher> logger, Indexer indexer) : BackgroundService
     {
         private static StreamReader GetLogStream(string logFile)
         {
@@ -139,9 +139,9 @@ public static class Live
             return sr;
         }
 
-        private static string GetNewestLog()
+        private string GetNewestLog()
         {
-            return new DirectoryInfo(Indexer.WorkingDirectory).GetFiles("*.txt")
+            return new DirectoryInfo(indexer.WorkingDirectory).GetFiles("*.txt")
                 .OrderByDescending(file => file.CreationTimeUtc).First().FullName;
         }
 
