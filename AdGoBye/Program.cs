@@ -2,7 +2,6 @@ global using AdGoBye.Types;
 using System.Text;
 using AdGoBye;
 using AdGoBye.Database;
-using AdGoBye.Plugins;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -87,6 +86,7 @@ internal class Program
         builder.Services.AddSingleton<Indexer>();
         builder.Services.AddSingleton<Blocklist>();
         builder.Services.AddSingleton<Patcher>();
+        builder.Services.AddSingleton<PluginLoader>();
         var host = builder.Build();
 
 
@@ -101,17 +101,6 @@ internal class Program
 
         await using var db = new AdGoByeContext();
         await db.Database.MigrateAsync();
-
-        PluginLoader.LoadPlugins();
-        foreach (var plugin in PluginLoader.LoadedPlugins)
-        {
-            logger.LogInformation("Plugin {Name} ({Maintainer}) v{Version} is loaded.", plugin.Name, plugin.Maintainer,
-                plugin.Version);
-            logger.LogInformation("Plugin type: {Type}", plugin.Instance.PluginType());
-
-            if (plugin.Instance.PluginType() == EPluginType.ContentSpecific && plugin.Instance.ResponsibleForContentIds() is not null)
-                logger.LogInformation("Responsible for {IDs}", plugin.Instance.ResponsibleForContentIds());
-        }
 
         if (blocklists.Blocks == null || blocklists.Blocks.Count == 0)
             logger.LogInformation("No blocklist has been loaded, is this intentional?");
