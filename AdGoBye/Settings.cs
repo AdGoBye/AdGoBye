@@ -4,25 +4,11 @@ using Microsoft.Extensions.Configuration;
 
 namespace AdGoBye;
 
-public static class Settings
+public class Settings
 {
-    static Settings()
-    {
-        var config = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json")
-            .Build();
-
-        if (ConvertV1SettingsToV2(config))
-            config.Reload();
-
-        Options = config.GetRequiredSection("Settings").Get<SettingsOptionsV2>() ?? new SettingsOptionsV2();
-    }
-
-    public static SettingsOptionsV2 Options { get; set; }
-
     #region appsettings.json conversion methods
 
-    private static bool ConvertV1SettingsToV2(IConfigurationRoot? config)
+    internal static bool ConvertV1SettingsToV2(IConfigurationRoot? config)
     {
         var section = config?.GetRequiredSection("Settings");
         if (section == null)
@@ -59,7 +45,10 @@ public static class Settings
             var jsonObject = JsonObject.Parse(File.ReadAllText("appsettings.json")) ?? new JsonObject();
             jsonObject["Settings"] = JsonNode.Parse(JsonSerializer.Serialize(settingsV2));
             File.WriteAllText("appsettings.json",
-                jsonObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+                jsonObject.ToJsonString(new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                }));
 
             return true;
         }

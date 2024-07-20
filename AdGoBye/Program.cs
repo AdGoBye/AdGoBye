@@ -4,9 +4,11 @@ using AdGoBye;
 using AdGoBye.Database;
 using AdGoBye.Plugins;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -42,12 +44,21 @@ internal class Program
 
         Console.OutputEncoding = Encoding.UTF8;
 
+        var builder = Host.CreateApplicationBuilder();
+
+        var configRoot = builder.Configuration.GetSection(nameof(Settings));
+        builder.Services.Configure<Settings.SettingsOptionsV2>(configRoot);
+        builder.Services.Configure<Settings.BlocklistOptions>(configRoot.GetSection("Blocklists"));
+        builder.Services.Configure<Settings.IndexerOptions>(configRoot.GetSection("Indexer"));
+        builder.Services.Configure<Settings.PatcherOptions>(configRoot.GetSection("Patcher"));
+
+
+        // HACK: We can't access SettingsOptionsV2 before we initialize Host per .Build(), but we can't configure Serilog after we do that
+        // Hence we'll have to read it out directly from configRoot and convert it to the appropriate value
         var levelSwitch = new LoggingLevelSwitch
         {
-            MinimumLevel = (LogEventLevel)Settings.Options.LogLevel
+            MinimumLevel = string.IsNullOrEmpty(configRoot["LogLevel"]) ? LogEventLevel.Verbose : (LogEventLevel)int.Parse(configRoot["LogLevel"]!)
         };
-
-        var builder = Host.CreateApplicationBuilder();
         builder.Services.AddSerilog((_, configuration) =>
             configuration.Enrich.FromLogContext().MinimumLevel.ControlledBy(levelSwitch)
                 .WriteTo.Console(new ExpressionTemplate(
@@ -55,12 +66,27 @@ internal class Program
                     theme: TemplateTheme.Literate)
                 )
         );
+        _isLogSet = true;
+
+        builder.Configuration.AddJsonFile("appsettings.json").Build();
+        // TODO: I'm not sure if this is valid like this, I doubt it 
+        Settings.ConvertV1SettingsToV2(builder.Configuration);
+        ((IConfigurationRoot)builder.Configuration).Reload();
+
+        builder.Services.AddSerilog((_, configuration) =>
+            configuration.Enrich.FromLogContext().MinimumLevel.ControlledBy(levelSwitch)
+                .WriteTo.Console(new ExpressionTemplate(
+                    "[{@t:HH:mm:ss} {@l:u3} {Coalesce(Substring(SourceContext, LastIndexOf(SourceContext, '.') + 1),'<none>')}] {@m}\n{@x}",
+                    theme: TemplateTheme.Literate)
+                )
+        );
+        _isLogSet = true;
+
+
         builder.Services.RegisterLiveServices();
         builder.Services.AddSingleton<Indexer>();
         builder.Services.AddSingleton<Blocklist>();
         builder.Services.AddSingleton<Patcher>();
-
-        _isLogSet = true;
         var host = builder.Build();
 
 
@@ -68,10 +94,10 @@ internal class Program
         var logger = host.Services.GetRequiredService<ILogger<Program>>();
         var blocklists = host.Services.GetRequiredService<Blocklist>();
         var patcher = host.Services.GetRequiredService<Patcher>();
-
+        var globalOptions = host.Services.GetRequiredService<IOptions<Settings.SettingsOptionsV2>>().Value;
         SingleInstance.Attach();
 
-        if (Settings.Options.EnableUpdateCheck) Updater.CheckUpdates();
+        if (globalOptions.EnableUpdateCheck) Updater.CheckUpdates();
 
         await using var db = new AdGoByeContext();
         await db.Database.MigrateAsync();
@@ -96,7 +122,7 @@ internal class Program
         Parallel.ForEach(db.Content.Include(content => content.VersionMeta),
             new ParallelOptions
             {
-                MaxDegreeOfParallelism = Settings.Options.MaxPatchThreads
+                MaxDegreeOfParallelism = globalOptions.MaxPatchThreads
             }, content =>
             {
                 if (content.Type != ContentType.World) return;
@@ -105,6 +131,6 @@ internal class Program
 
         await db.SaveChangesAsync();
 
-        if (Settings.Options.EnableLive) host.Run();
+        if (globalOptions.EnableLive) host.Run();
     }
 }

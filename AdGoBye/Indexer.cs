@@ -9,6 +9,7 @@ using AssetsTools.NET;
 using AssetsTools.NET.Extra;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AdGoBye;
 
@@ -16,10 +17,15 @@ public class Indexer
 {
     private readonly ILogger<Indexer> _logger;
     public readonly string WorkingDirectory;
+    private readonly Settings.IndexerOptions _options;
+    private readonly Settings.SettingsOptionsV2 _optionsGlobal;
 
-    public Indexer(ILogger<Indexer> logger)
+    public Indexer(ILogger<Indexer> logger, IOptions<Settings.IndexerOptions> options, IOptions<Settings.SettingsOptionsV2> optionsGlobal)
     {
         _logger = logger;
+
+        _options = options.Value;
+        _optionsGlobal = optionsGlobal.Value;
         WorkingDirectory = GetWorkingDirectory();
         ManageIndex();
     }
@@ -73,9 +79,9 @@ public class Indexer
         _logger.LogInformation("Finished Index processing");
         return;
 
-        static int SafeAllowlistCount()
+        int SafeAllowlistCount()
         {
-            return Settings.Options.Indexer.Allowlist is not null ? Settings.Options.Indexer.Allowlist.Length : 0;
+            return _options.Allowlist is not null ? _options.Allowlist.Length : 0;
         }
     }
 
@@ -132,7 +138,7 @@ public class Indexer
         var dbActionsContainer = new DatabaseOperationsContainer();
         Parallel.ForEach(paths, new ParallelOptions
             {
-                MaxDegreeOfParallelism = Settings.Options.MaxIndexerThreads
+                MaxDegreeOfParallelism = _optionsGlobal.MaxIndexerThreads
             },
             path => AddToIndex(path.FullName, ref dbActionsContainer));
         CommitToDatabase(dbActionsContainer);
@@ -452,8 +458,8 @@ public class Indexer
     [SuppressMessage("ReSharper", "StringLiteralTypo")]
     private string GetWorkingDirectory()
     {
-        if (!string.IsNullOrEmpty(Settings.Options.Indexer.WorkingFolder))
-            return Settings.Options.Indexer.WorkingFolder;
+        if (!string.IsNullOrEmpty(_options.WorkingFolder))
+            return _options.WorkingFolder;
         var appName = SteamParser.GetApplicationName();
         var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
             .Replace("Roaming", "LocalLow");

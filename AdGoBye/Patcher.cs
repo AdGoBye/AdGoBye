@@ -1,13 +1,15 @@
 ﻿using AdGoBye.PluginInternal;
 using AdGoBye.Plugins;
 using AssetsTools.NET;
+using Microsoft.Extensions.Options;
 using Serilog;
 
 namespace AdGoBye
 {
-    internal class Patcher(Blocklist blocklists)
+    internal class Patcher(Blocklist blocklists, IOptions<Settings.PatcherOptions> options)
     {
         private static readonly ILogger Logger = Log.ForContext(typeof(Patcher));
+        private readonly Settings.PatcherOptions _options = options.Value;
 
         internal void PatchContent(Content content)
         {
@@ -19,7 +21,7 @@ namespace AdGoBye
 
             var estimatedUncompressedSize = EstimateDecompressedSize(container.Bundle.file);
 
-            if (estimatedUncompressedSize > (Settings.Options.Patcher.ZipBombSizeLimitMB * 1000L * 1000L))
+            if (estimatedUncompressedSize > _options.ZipBombSizeLimitMB * 1000L * 1000L)
             {
                 Logger.Warning("Skipped {ID} ({directory}) because it's likely a ZIP Bomb ({estimatedMB}MB uncompressed).",
                     content.Id, content.VersionMeta.Path, (estimatedUncompressedSize / 1000 / 1000));
@@ -60,7 +62,7 @@ namespace AdGoBye
                         }
                     }
 
-                    if (!Settings.Options.Patcher.DryRun && plugin.Instance.WantsIndexerTracking())
+                    if (!_options.DryRun && plugin.Instance.WantsIndexerTracking())
                         content.VersionMeta.PatchedBy.Add(plugin.Name);
 
                     plugin.Instance.PostPatch(content);
@@ -90,7 +92,7 @@ namespace AdGoBye
                 }
             }
 
-            if (Settings.Options.Patcher.DryRun) return;
+            if (_options.DryRun) return;
             if (!someoneModifiedBundle) return;
 
             Logger.Information("Done, writing changes as bundle");
@@ -98,9 +100,9 @@ namespace AdGoBye
             container.Bundle.file.BlockAndDirInfo.DirectoryInfos[1].SetNewData(container.AssetsFile.file);
             using var writer = new AssetsFileWriter(file + ".clean");
 
-            if (Settings.Options.Patcher.EnableRecompression)
+            if (_options.EnableRecompression)
             {
-                if (estimatedUncompressedSize > Settings.Options.Patcher.RecompressionMemoryMaxMB * 1000L * 1000L
+                if (estimatedUncompressedSize > _options.RecompressionMemoryMaxMB * 1000L * 1000L
                     || estimatedUncompressedSize >=
                     1_900_000_000) // 1.9GB hard limit to leave a 100MB buffer just in case the estimation is off.
                 {
@@ -144,9 +146,9 @@ namespace AdGoBye
             container.Bundle.file.Close();
             container.AssetsFile.file.Close();
 
-            File.Replace(file + ".clean", file, Settings.Options.Patcher.DisableBackupFile ? null : file + ".bak");
+            File.Replace(file + ".clean", file, _options.DisableBackupFile ? null : file + ".bak");
 
-            if (!Settings.Options.Patcher.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
+            if (!_options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
             foreach (var plugin in pluginsDidPatch)
             {
                 try

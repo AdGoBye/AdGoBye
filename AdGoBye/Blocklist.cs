@@ -11,6 +11,7 @@ using AdGoBye.Database;
 using AssetsTools.NET;
 using AssetsTools.NET.Extra;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Tomlyn;
 
 namespace AdGoBye;
@@ -20,11 +21,13 @@ namespace AdGoBye;
 public class Blocklist
 {
     private readonly ILogger<Blocklist> _logger;
+    private readonly Settings.BlocklistOptions _options;
     public Dictionary<string, HashSet<GameObjectInstance>>? Blocks;
 
-    public Blocklist(ILogger<Blocklist> logger)
+    public Blocklist(ILogger<Blocklist> logger, IOptions<Settings.BlocklistOptions> options)
     {
         _logger = logger;
+        _options = options.Value;
         UpdateNetworkBlocklists();
         Blocks = BlocklistsParser(GetBlocklists());
     }
@@ -80,7 +83,7 @@ public class Blocklist
         using var db = new AdGoByeContext();
         var blocklistEntries = db.NetworkBlocklists;
         foreach (var danglingBlocklist in blocklistEntries.Where(blocklist =>
-                     Settings.Options.Blocklist.BlocklistUrls.All(url => url != blocklist.Url)))
+                     _options.BlocklistUrls.All(url => url != blocklist.Url)))
         {
             _logger.LogInformation("Removing dangling blocklist for {url}", danglingBlocklist.Url);
             blocklistEntries.RemoveRange(danglingBlocklist);
@@ -88,7 +91,7 @@ public class Blocklist
 
         db.SaveChanges();
 
-        foreach (var optionsUrl in Settings.Options.Blocklist.BlocklistUrls)
+        foreach (var optionsUrl in _options.BlocklistUrls)
         {
             var databaseQuery = blocklistEntries
                 .FirstOrDefault(databaseEntry => databaseEntry.Url == optionsUrl);
@@ -131,7 +134,7 @@ public class Blocklist
             ParseAndAddBlocklist(file, File.ReadAllText(file));
         }
 
-        if (Settings.Options.Blocklist.BlocklistUrls.Length is 0) return final;
+        if (_options.BlocklistUrls.Length is 0) return final;
 
         foreach (var blocklist in db.NetworkBlocklists)
         {
@@ -255,7 +258,7 @@ public class Blocklist
                 "Following blocklist objects weren't disabled: {@UnpatchedList}" +
                 "\nThis can mean that these blocklist entries are outdated, consider informing the maintainer",
                 unpatchedObjects);
-            if (Settings.Options.Blocklist.SendUnmatchedObjectsToDevs)
+            if (_options.SendUnmatchedObjectsToDevs)
                 SendUnpatchedObjects(content, unpatchedObjects);
         }
 
@@ -335,7 +338,7 @@ public class Blocklist
         HttpResponseMessage response;
         try
         {
-            response = await client.PostAsJsonAsync(Settings.Options.Blocklist.BlocklistUnmatchedServer, payload);
+            response = await client.PostAsJsonAsync(_options.BlocklistUnmatchedServer, payload);
         }
         catch (Exception e)
         {
