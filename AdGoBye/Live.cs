@@ -72,7 +72,7 @@ public static class Live
                 watcher.EnableRaisingEvents = true;
                 while (!stoppingToken.IsCancellationRequested)
                 {
-                    watcher.WaitForChanged(WatcherChangeTypes.Created, Timeout.Infinite);
+                    watcher.WaitForChanged(WatcherChangeTypes.Created, 500);
                 }
             });
         }
@@ -121,9 +121,9 @@ public static class Live
                 };
                 watcher.EnableRaisingEvents = true;
 
-                while (true)
+                while (!stoppingToken.IsCancellationRequested)
                 {
-                    watcher.WaitForChanged(WatcherChangeTypes.Created, Timeout.Infinite);
+                    watcher.WaitForChanged(WatcherChangeTypes.Created, 500);
                 }
             });
         }
