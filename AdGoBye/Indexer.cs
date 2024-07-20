@@ -16,9 +16,9 @@ namespace AdGoBye;
 public class Indexer
 {
     private readonly ILogger<Indexer> _logger;
-    public readonly string WorkingDirectory;
     private readonly Settings.IndexerOptions _options;
     private readonly Settings.SettingsOptionsV2 _optionsGlobal;
+    public readonly string WorkingDirectory;
 
     public Indexer(ILogger<Indexer> logger, IOptions<Settings.IndexerOptions> options, IOptions<Settings.SettingsOptionsV2> optionsGlobal)
     {
@@ -81,7 +81,7 @@ public class Indexer
 
         int SafeAllowlistCount()
         {
-            return _options.Allowlist is not null ? _options.Allowlist.Length : 0;
+            return _options.Allowlist?.Length ?? 0;
         }
     }
 
