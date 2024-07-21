@@ -17,15 +17,13 @@ public class Indexer
 {
     private readonly ILogger<Indexer> _logger;
     private readonly Settings.IndexerOptions _options;
-    private readonly Settings.SettingsOptionsV2 _optionsGlobal;
     public readonly string WorkingDirectory;
 
-    public Indexer(ILogger<Indexer> logger, IOptions<Settings.IndexerOptions> options, IOptions<Settings.SettingsOptionsV2> optionsGlobal)
+    public Indexer(ILogger<Indexer> logger, IOptions<Settings.IndexerOptions> options)
     {
         _logger = logger;
 
         _options = options.Value;
-        _optionsGlobal = optionsGlobal.Value;
         WorkingDirectory = GetWorkingDirectory();
         ManageIndex();
     }
@@ -138,7 +136,7 @@ public class Indexer
         var dbActionsContainer = new DatabaseOperationsContainer();
         Parallel.ForEach(paths, new ParallelOptions
             {
-                MaxDegreeOfParallelism = _optionsGlobal.MaxIndexerThreads
+                MaxDegreeOfParallelism = _options.MaxIndexerThreads
             },
             path => AddToIndex(path.FullName, ref dbActionsContainer));
         CommitToDatabase(dbActionsContainer);
