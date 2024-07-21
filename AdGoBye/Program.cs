@@ -68,7 +68,6 @@ internal class Program
         _isLogSet = true;
 
         builder.Configuration.AddJsonFile("appsettings.json").Build();
-        // TODO: I'm not sure if this is valid like this, I doubt it 
         Settings.ConvertV1SettingsToV2(builder.Configuration);
         ((IConfigurationRoot)builder.Configuration).Reload();
 
