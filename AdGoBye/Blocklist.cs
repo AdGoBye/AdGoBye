@@ -31,7 +31,6 @@ public class Blocklist
         UpdateNetworkBlocklists();
         Blocks = BlocklistsParser(GetBlocklists());
         if (Blocks.Count == 0) logger.LogInformation("No blocklist has been loaded, is this intentional?");
-        ;
     }
 
 
