@@ -54,7 +54,11 @@ internal class Program
         builder.Services.Configure<Settings.IndexerOptions>(configRoot.GetSection("Indexer"));
         builder.Services.Configure<Settings.PatcherOptions>(configRoot.GetSection("Patcher"));
 
-        builder.Services.AddDbContextFactory<AdGoByeContext>();
+        builder.Services.AddDbContextFactory<AdGoByeContext>(optionsBuilder =>
+        {
+            optionsBuilder.EnableSensitiveDataLogging();
+            optionsBuilder.UseSqlite("Data Source=database.db");
+        });
 
         builder.Services.RegisterLiveServices();
         builder.Services.AddSingleton<Indexer>();
