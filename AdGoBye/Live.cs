@@ -86,7 +86,7 @@ public static class Live
                 {
                     indexer.AddToIndex(path);
                     Ewh.WaitOne();
-                    var newContent = Indexer.GetFromIndex(path);
+                    var newContent = indexer.GetFromIndex(path);
                     if (newContent is not null) patcher.PatchContent(newContent);
                     done = true;
                 }

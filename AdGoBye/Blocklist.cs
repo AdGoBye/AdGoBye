@@ -10,6 +10,7 @@ using System.Text.Json.Serialization;
 using AdGoBye.Database;
 using AssetsTools.NET;
 using AssetsTools.NET.Extra;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Tomlyn;
@@ -20,14 +21,16 @@ namespace AdGoBye;
 [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 public class Blocklist
 {
+    private readonly IDbContextFactory<AdGoByeContext> _dbFac;
     private readonly ILogger<Blocklist> _logger;
     private readonly Settings.BlocklistOptions _options;
     public required Dictionary<string, HashSet<GameObjectInstance>> Blocks;
 
-    public Blocklist(ILogger<Blocklist> logger, IOptions<Settings.BlocklistOptions> options)
+    public Blocklist(ILogger<Blocklist> logger, IOptions<Settings.BlocklistOptions> options, IDbContextFactory<AdGoByeContext> dbFac)
     {
         _logger = logger;
         _options = options.Value;
+        _dbFac = dbFac;
         UpdateNetworkBlocklists();
         Blocks = BlocklistsParser(GetBlocklists());
         if (Blocks.Count == 0) logger.LogInformation("No blocklist has been loaded, is this intentional?");
@@ -81,7 +84,7 @@ public class Blocklist
 
     public void UpdateNetworkBlocklists()
     {
-        using var db = new AdGoByeContext();
+        using var db = _dbFac.CreateDbContext();
         var blocklistEntries = db.NetworkBlocklists;
         foreach (var danglingBlocklist in blocklistEntries.Where(blocklist =>
                      _options.BlocklistUrls.All(url => url != blocklist.Url)))
@@ -127,7 +130,7 @@ public class Blocklist
 
     private List<BlocklistModel> GetBlocklists()
     {
-        using var db = new AdGoByeContext();
+        using var db = _dbFac.CreateDbContext();
         var final = new List<BlocklistModel>();
         Directory.CreateDirectory("./Blocklists");
         foreach (var file in Directory.GetFiles("./Blocklists"))

@@ -54,8 +54,7 @@ internal class Program
         builder.Services.Configure<Settings.IndexerOptions>(configRoot.GetSection("Indexer"));
         builder.Services.Configure<Settings.PatcherOptions>(configRoot.GetSection("Patcher"));
 
-        await using var db = new AdGoByeContext();
-        await db.Database.MigrateAsync();
+        builder.Services.AddDbContextFactory<AdGoByeContext>();
 
         builder.Services.RegisterLiveServices();
         builder.Services.AddSingleton<Indexer>();
@@ -64,6 +63,9 @@ internal class Program
         builder.Services.AddSingleton<PluginLoader>();
         var host = builder.Build();
         SingleInstance.Attach();
+
+        var db = await host.Services.GetRequiredService<IDbContextFactory<AdGoByeContext>>().CreateDbContextAsync();
+        await db.Database.MigrateAsync();
 
         var logger = host.Services.GetRequiredService<ILogger<Program>>();
         var blocklists = host.Services.GetRequiredService<Blocklist>();
@@ -74,8 +76,6 @@ internal class Program
 
         if (globalOptions.EnableUpdateCheck) Updater.CheckUpdates();
 
-
-
         logger.LogInformation("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
             blocklists.Blocks.Count, db.Content.Count());
 
@@ -84,8 +84,6 @@ internal class Program
             {
                 MaxDegreeOfParallelism = globalOptions.Patcher.MaxPatchThreads
             }, content => { patcher.PatchContent(content); });
-
-        await db.SaveChangesAsync();
         if (!globalOptions.EnableLive) await host.StopAsync();
         await host.WaitForShutdownAsync();
     }

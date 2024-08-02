@@ -15,14 +15,15 @@ namespace AdGoBye;
 
 public class Indexer
 {
+    private readonly IDbContextFactory<AdGoByeContext> _dbFac;
     private readonly ILogger<Indexer> _logger;
     private readonly Settings.IndexerOptions _options;
     public readonly string WorkingDirectory;
 
-    public Indexer(ILogger<Indexer> logger, IOptions<Settings.IndexerOptions> options)
+    public Indexer(ILogger<Indexer> logger, IOptions<Settings.IndexerOptions> options, IDbContextFactory<AdGoByeContext> dbFac)
     {
         _logger = logger;
-
+        _dbFac = dbFac;
         _options = options.Value;
         WorkingDirectory = GetWorkingDirectory();
         ManageIndex();
@@ -30,7 +31,7 @@ public class Indexer
 
     private void ManageIndex()
     {
-        using var db = new AdGoByeContext();
+        using var db = _dbFac.CreateDbContext();
         var container = new DatabaseOperationsContainer();
         if (db.Content.Any()) VerifyDbTruth(ref container);
         CommitToDatabase(container);
@@ -85,7 +86,7 @@ public class Indexer
 
     private void VerifyDbTruth(ref DatabaseOperationsContainer container)
     {
-        using var db = new AdGoByeContext();
+        using var db = _dbFac.CreateDbContext();
         foreach (var content in db.Content.Include(content => content.VersionMeta))
         {
             var directoryMeta = new DirectoryInfo(content.VersionMeta.Path);
@@ -144,7 +145,7 @@ public class Indexer
 
     private void AddToIndex(string path, ref DatabaseOperationsContainer container)
     {
-        using var db = new AdGoByeContext();
+        using var db = _dbFac.CreateDbContext();
         //   - Folder (StableContentName) [singleton, we want this]
         //       - Folder (version) [may exist multiple times] 
         //          - __info
@@ -284,19 +285,19 @@ public class Indexer
         }
     }
 
-    private static void CommitToDatabase(DatabaseOperationsContainer container)
+    private void CommitToDatabase(DatabaseOperationsContainer container)
     {
-        using var writeDbContext = new AdGoByeContext();
-        writeDbContext.Content.AddRange(container.AddContent);
-        writeDbContext.Content.UpdateRange(container.EditContent);
-        writeDbContext.Content.RemoveRange(container.RemoveContent);
-        writeDbContext.SaveChanges();
+        using var db = _dbFac.CreateDbContext();
+        db.Content.AddRange(container.AddContent);
+        db.Content.UpdateRange(container.EditContent);
+        db.Content.RemoveRange(container.RemoveContent);
+        db.SaveChanges();
     }
 
 
-    public static Content? GetFromIndex(string path)
+    public Content? GetFromIndex(string path)
     {
-        using var db = new AdGoByeContext();
+        using var db = _dbFac.CreateDbContext();
         var directory = new DirectoryInfo(path);
         return db.Content.Include(content => content.VersionMeta)
             .FirstOrDefault(content => content.StableContentName == directory.Parent!.Parent!.Name);
@@ -304,7 +305,7 @@ public class Indexer
 
     public void RemoveFromIndex(string path)
     {
-        using var db = new AdGoByeContext();
+        using var db = _dbFac.CreateDbContext();
         var indexMatch = GetFromIndex(path);
         if (indexMatch is null) return;
 
