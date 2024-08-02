@@ -117,7 +117,8 @@ public class Settings
                 ["Default"] = "Verbose",
                 ["Override"] = new JsonObject
                 {
-                    ["Microsoft"] = "Warning"
+                    ["Microsoft"] = "Warning",
+                    ["Microsoft.EntityFrameworkCore.Model.Validation"] = "Error"
                 }
             },
             ["WriteTo"] = new JsonArray
