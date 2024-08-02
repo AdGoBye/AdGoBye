@@ -1,5 +1,6 @@
-using System.Diagnostics.CodeAnalysis;
-using Serilog;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 // ReSharper disable FunctionNeverReturns
 
@@ -9,149 +10,168 @@ public static class Live
 {
     private const string LoadStartIndicator = "[Behaviour] Preparing assets...";
     private const string LoadStopIndicator = "Entering world";
-    private static readonly ILogger Logger = Log.ForContext(typeof(Live));
     private static readonly EventWaitHandle Ewh = new(true, EventResetMode.ManualReset);
+    private static CancellationTokenSource _logwatcherStoppingToken = new();
 
-    public static void WatchNewContent(string path)
+    public static void RegisterLiveServices(this IServiceCollection services)
     {
-        using var watcher = new FileSystemWatcher(path);
-
-        watcher.NotifyFilter = NotifyFilters.Attributes
-                               | NotifyFilters.CreationTime
-                               | NotifyFilters.DirectoryName
-                               | NotifyFilters.FileName
-                               | NotifyFilters.LastAccess
-                               | NotifyFilters.LastWrite
-                               | NotifyFilters.Security
-                               | NotifyFilters.Size;
-
-        /* HACK: [Regalia 2023-11-18T19:43:50Z] FileSystemWatcher doesn't detect __data on Windows only
-          Instead, we track for __info and replace it with __data.
-          This has the implication that info is always created alongside data.
-          This might also break if the detection failure is caused intentionally by adversarial motive.
-        */
-        watcher.Created += (_, e) => Task.Run(() => ParseFile(e.FullPath.Replace("__info", "__data")));
-        watcher.Deleted += (_, e) => Task.Run(
-            () =>
-            {
-                Logger.Verbose("File removal: {directory}", e.FullPath);
-                Indexer.RemoveFromIndex(e.FullPath.Replace("__info", "__data"));
-            });
-
-        watcher.Error += (_, e) =>
-        {
-            switch (e.GetException())
-            {
-                case InternalBufferOverflowException:
-                    Logger.Error(
-                        "FileSystemWatcher's internal buffer experienced an overflow, we may have missed some file events!\n" +
-                        "Your Indexer state may not correct anymore, restart if something doesn't work.\n" +
-                        "If you experience this often, please tell us at https://github.com/AdGoBye/AdGoBye/issues.");
-                    break;
-                default:
-                    Logger.Error("FileSystemWatcher threw an exception: {exception}", e);
-                    break;
-            }
-        };
-
-        watcher.Filter = "__info";
-        watcher.IncludeSubdirectories = true;
-        watcher.EnableRaisingEvents = true;
-        while (true)
-        {
-            watcher.WaitForChanged(WatcherChangeTypes.Created, Timeout.Infinite);
-        }
+        services.AddHostedService<LogFileWatcher>();
+        services.AddHostedService<Logwatcher>();
+        services.AddHostedService<ContentWatcher>();
     }
 
-    private static async void ParseFile(string path)
+    internal class ContentWatcher(ILogger<ContentWatcher> logger, Indexer indexer, Patcher patcher) : BackgroundService
     {
-        var done = false;
-        while (!done)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            try
+            await Task.Run(() =>
             {
-                Indexer.AddToIndex(path);
-                Ewh.WaitOne();
-                var newContent = Indexer.GetFromIndex(path);
-                if (newContent is not null) Patcher.PatchContent(newContent);
-                done = true;
-            }
-            catch (EndOfStreamException)
-            {
-                await Task.Delay(500);
-            }
-        }
-    }
+                using var watcher = new FileSystemWatcher(indexer.WorkingDirectory);
 
+                watcher.NotifyFilter = NotifyFilters.Attributes
+                                       | NotifyFilters.CreationTime
+                                       | NotifyFilters.DirectoryName
+                                       | NotifyFilters.FileName
+                                       | NotifyFilters.LastAccess
+                                       | NotifyFilters.LastWrite
+                                       | NotifyFilters.Security
+                                       | NotifyFilters.Size;
 
-    [SuppressMessage("ReSharper", "MethodSupportsCancellation")]
-    public static void WatchLogFile(string path)
-    {
-        CancellationTokenSource ct = new();
-        var currentTask = Task.Run(() => HandleFileLock(GetNewestLog(), ct.Token));
+                // "Cancellation is cooperative and is not forced on the listener.
+                // The listener determines how to gracefully terminate in response to a cancellation request."
+                //
+                // Nothing consumes this token, this suggestion is not useful.
+                // ReSharper disable MethodSupportsCancellation
+                watcher.Created += (_, e) => Task.Run(() => ParseFile(e.FullPath.Replace("__info", "__data")));
+                watcher.Deleted += (_, e) => Task.Run(
+                    () =>
+                    {
+                        logger.LogTrace("File removal: {directory}", e.FullPath);
+                        indexer.RemoveFromIndex(e.FullPath.Replace("__info", "__data"));
+                    });
+                // ReSharper restore MethodSupportsCancellation
 
-        using var watcher = new FileSystemWatcher(path);
-        watcher.NotifyFilter = NotifyFilters.FileName;
-        watcher.Created += (_, e) =>
-        {
-            ct.Cancel();
-            currentTask.Wait();
-            ct = new CancellationTokenSource();
-
-            // Assuming a new log file means a client restart, it's likely not loading any file.
-            // Let's take initiative and free any tasks.
-            Ewh.Set();
-
-            currentTask = Task.Run(() => HandleFileLock(e.FullPath, ct.Token));
-            Logger.Verbose("Rotated log parsing to {file}", e.Name);
-        };
-
-        watcher.Filter = "*.txt";
-        watcher.IncludeSubdirectories = false;
-        watcher.EnableRaisingEvents = true;
-        while (true)
-        {
-            watcher.WaitForChanged(WatcherChangeTypes.Created, Timeout.Infinite);
-        }
-    }
-
-    private static void HandleFileLock(string logFile, CancellationToken cancellationToken)
-    {
-        var sr = GetLogStream(logFile);
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            var output = sr.ReadToEnd();
-            var lines = output.Split(Environment.NewLine);
-            foreach (var line in lines)
-            {
-                switch (line)
+                watcher.Error += (_, e) =>
                 {
-                    case not null when line.Contains(LoadStartIndicator):
-                        Logger.Verbose("Expecting world load: {msg}", line);
-                        Ewh.Reset();
-                        break;
-                    case not null when line.Contains(LoadStopIndicator):
-                        Logger.Verbose("Expecting world load finish: {msg}", line);
-                        Ewh.Set();
-                        break;
+                    switch (e.GetException())
+                    {
+                        case InternalBufferOverflowException:
+                            logger.LogError(
+                                "FileSystemWatcher's internal buffer experienced an overflow, we may have missed some file events!\n" +
+                                "Your Indexer state may not correct anymore, restart if something doesn't work.\n" +
+                                "If you experience this often, please tell us at https://github.com/AdGoBye/AdGoBye/issues.");
+                            break;
+                        default:
+                            logger.LogError("FileSystemWatcher threw an exception: {exception}", e);
+                            break;
+                    }
+                };
+
+                watcher.Filter = "__info";
+                watcher.IncludeSubdirectories = true;
+                watcher.EnableRaisingEvents = true;
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    watcher.WaitForChanged(WatcherChangeTypes.Created, 500);
+                }
+            });
+        }
+
+        private async void ParseFile(string path)
+        {
+            var done = false;
+            while (!done)
+            {
+                try
+                {
+                    indexer.AddToIndex(path);
+                    Ewh.WaitOne();
+                    var newContent = Indexer.GetFromIndex(path);
+                    if (newContent is not null) patcher.PatchContent(newContent);
+                    done = true;
+                }
+                catch (EndOfStreamException)
+                {
+                    await Task.Delay(500);
                 }
             }
-
-            Thread.Sleep(300);
         }
     }
 
-    private static StreamReader GetLogStream(string logFile)
+    internal class LogFileWatcher(ILogger<LogFileWatcher> logger, Indexer indexer) : BackgroundService
     {
-        var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        var sr = new StreamReader(fs);
-        sr.BaseStream.Seek(0, SeekOrigin.End);
-        return sr;
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            await Task.Run(() =>
+            {
+                using var watcher = new FileSystemWatcher(indexer.WorkingDirectory);
+                watcher.NotifyFilter = NotifyFilters.FileName;
+                watcher.Filter = "*.txt";
+                watcher.IncludeSubdirectories = false;
+                watcher.Created += (_, e) =>
+                {
+                    _logwatcherStoppingToken.Cancel();
+                    _logwatcherStoppingToken = new CancellationTokenSource();
+
+                    // Assuming a new log file means a client restart, it's likely not loading any file.
+                    // Let's take initiative and free any tasks.
+                    Ewh.Set();
+
+                    logger.LogTrace("Rotated log parsing to {file}", e.Name);
+                };
+                watcher.EnableRaisingEvents = true;
+
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    watcher.WaitForChanged(WatcherChangeTypes.Created, 500);
+                }
+            });
+        }
     }
 
-    private static string GetNewestLog()
+    internal class Logwatcher(ILogger<Logwatcher> logger, Indexer indexer) : BackgroundService
     {
-        return new DirectoryInfo(Indexer.WorkingDirectory).GetFiles("*.txt")
-            .OrderByDescending(file => file.CreationTimeUtc).First().FullName;
+        private static StreamReader GetLogStream(string logFile)
+        {
+            var fs = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var sr = new StreamReader(fs);
+            sr.BaseStream.Seek(0, SeekOrigin.End);
+            return sr;
+        }
+
+        private string GetNewestLog()
+        {
+            return new DirectoryInfo(indexer.WorkingDirectory).GetFiles("*.txt")
+                .OrderByDescending(file => file.CreationTimeUtc).First().FullName;
+        }
+
+
+        protected override async Task ExecuteAsync(CancellationToken applicationQuitToken)
+        {
+            var logPath = GetNewestLog();
+            var sr = GetLogStream(logPath);
+            logger.LogTrace("Now reading logfile {path}", logPath);
+            while (!_logwatcherStoppingToken.IsCancellationRequested || !applicationQuitToken.IsCancellationRequested)
+            {
+                var output = await sr.ReadToEndAsync(applicationQuitToken);
+                var lines = output.Split(Environment.NewLine);
+                foreach (var line in lines)
+                {
+                    switch (line)
+                    {
+                        case not null when line.Contains(LoadStartIndicator):
+                            logger.LogTrace("Expecting world load: {msg}", line);
+                            Ewh.Reset();
+                            break;
+                        case not null when line.Contains(LoadStopIndicator):
+                            logger.LogTrace("Expecting world load finish: {msg}", line);
+                            Ewh.Set();
+                            break;
+                    }
+                }
+
+                await Task.Delay(300, applicationQuitToken);
+            }
+        }
     }
 }

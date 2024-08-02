@@ -1,16 +1,31 @@
 ﻿using System.Reflection;
 using AdGoBye.PluginInternal;
 using AdGoBye.Plugins;
-using Serilog;
+using Microsoft.Extensions.Logging;
 
 namespace AdGoBye;
 
-public static class PluginLoader
+public class PluginLoader
 {
-    private static readonly ILogger Logger = Log.ForContext(typeof(PluginLoader));
     public static readonly List<PluginEntry> LoadedPlugins = [];
+    private readonly ILogger<PluginLoader> _logger;
 
-    public static void LoadPlugins()
+    public PluginLoader(ILogger<PluginLoader> logger)
+    {
+        _logger = logger;
+        LoadPlugins();
+        foreach (var plugin in LoadedPlugins)
+        {
+            _logger.LogInformation("Plugin {Name} ({Maintainer}) v{Version} is loaded.", plugin.Name, plugin.Maintainer,
+                plugin.Version);
+            _logger.LogInformation("Plugin type: {Type}", plugin.Instance.PluginType());
+
+            if (plugin.Instance.PluginType() == EPluginType.ContentSpecific && plugin.Instance.ResponsibleForContentIds() is not null)
+                _logger.LogInformation("Responsible for {IDs}", plugin.Instance.ResponsibleForContentIds());
+        }
+    }
+
+    private void LoadPlugins()
     {
         var pluginLoadPath = GetRelativeDirectoryPath("Plugins");
         Directory.CreateDirectory(pluginLoadPath);
@@ -37,7 +52,7 @@ public static class PluginLoader
         }
     }
 
-    private static void LoadPlugin(string pluginPath)
+    private void LoadPlugin(string pluginPath)
     {
         Assembly? plugin;
 
@@ -49,7 +64,7 @@ public static class PluginLoader
         }
         catch (Exception e)
         {
-            Logger.Error("Plugin {path} failed to load with error: {error}", pluginPath, e);
+            _logger.LogError("Plugin {path} failed to load with error: {error}", pluginPath, e);
             return;
         }
 
@@ -79,7 +94,7 @@ public static class PluginLoader
         if (string.IsNullOrEmpty(pluginName) || string.IsNullOrEmpty(pluginVersion) ||
             pluginClass is null)
         {
-            Logger.Error("Plugin {path} failed to load as it was missing a name, version or class.", pluginPath);
+            _logger.LogError("Plugin {path} failed to load as it was missing a name, version or class.", pluginPath);
             return;
         }
 

@@ -1,27 +1,28 @@
 ﻿using AdGoBye.PluginInternal;
 using AdGoBye.Plugins;
 using AssetsTools.NET;
-using Serilog;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AdGoBye
 {
-    internal class Patcher
+    internal class Patcher(Blocklist blocklists, IOptions<Settings.PatcherOptions> options, ILogger<Patcher> logger)
     {
-        private static readonly ILogger Logger = Log.ForContext(typeof(Patcher));
+        private readonly Settings.PatcherOptions _options = options.Value;
 
-        internal static void PatchContent(Content content)
+        internal void PatchContent(Content content)
         {
             if (content.Type is not ContentType.World) return;
-            Logger.Information("Processing {ID} ({directory})", content.Id, content.VersionMeta.Path);
+            logger.LogInformation("Processing {ID} ({directory})", content.Id, content.VersionMeta.Path);
 
             var file = Path.Combine(content.VersionMeta.Path, "__data");
             var container = new ContentAssetManagerContainer(file);
 
             var estimatedUncompressedSize = EstimateDecompressedSize(container.Bundle.file);
 
-            if (estimatedUncompressedSize > (Settings.Options.Patcher.ZipBombSizeLimitMB * 1000L * 1000L))
+            if (estimatedUncompressedSize > _options.ZipBombSizeLimitMB * 1000L * 1000L)
             {
-                Logger.Warning("Skipped {ID} ({directory}) because it's likely a ZIP Bomb ({estimatedMB}MB uncompressed).",
+                logger.LogWarning("Skipped {ID} ({directory}) because it's likely a ZIP Bomb ({estimatedMB}MB uncompressed).",
                     content.Id, content.VersionMeta.Path, (estimatedUncompressedSize / 1000 / 1000));
                 return;
             }
@@ -60,47 +61,47 @@ namespace AdGoBye
                         }
                     }
 
-                    if (!Settings.Options.Patcher.DryRun && plugin.Instance.WantsIndexerTracking())
+                    if (!_options.DryRun && plugin.Instance.WantsIndexerTracking())
                         content.VersionMeta.PatchedBy.Add(plugin.Name);
 
                     plugin.Instance.PostPatch(content);
                 }
                 catch (Exception e)
                 {
-                    Logger.Error(e,
+                    logger.LogError(e,
                         "Plugin {Name} ({Maintainer}) v{Version} threw an exception while patching {ID} ({path})",
                         plugin.Name, plugin.Maintainer, plugin.Version, content.Id, content.VersionMeta.Path);
                 }
             }
 
-            if (Blocklist.Blocks is not null && !pluginOverridesBlocklist &&
+            if (blocklists.Blocks.Count != 0 && !pluginOverridesBlocklist &&
                 !content.VersionMeta.PatchedBy.Contains("Blocklist"))
             {
-                foreach (var block in Blocklist.Blocks.Where(block => block.Key.Equals(content.Id)))
+                foreach (var block in blocklists.Blocks.Where(block => block.Key.Equals(content.Id)))
                 {
                     try
                     {
-                        if (Blocklist.Patch(content, container, [.. block.Value]))
+                        if (blocklists.Patch(content, container, [.. block.Value]))
                             someoneModifiedBundle = true;
                     }
                     catch (Exception e)
                     {
-                        Logger.Error(e, "Failed to patch {ID} ({path})", content.Id, content.VersionMeta.Path);
+                        logger.LogError(e, "Failed to patch {ID} ({path})", content.Id, content.VersionMeta.Path);
                     }
                 }
             }
 
-            if (Settings.Options.Patcher.DryRun) return;
+            if (_options.DryRun) return;
             if (!someoneModifiedBundle) return;
 
-            Logger.Information("Done, writing changes as bundle");
+            logger.LogInformation("Done, writing changes as bundle");
 
             container.Bundle.file.BlockAndDirInfo.DirectoryInfos[1].SetNewData(container.AssetsFile.file);
             using var writer = new AssetsFileWriter(file + ".clean");
 
-            if (Settings.Options.Patcher.EnableRecompression)
+            if (_options.EnableRecompression)
             {
-                if (estimatedUncompressedSize > Settings.Options.Patcher.RecompressionMemoryMaxMB * 1000L * 1000L
+                if (estimatedUncompressedSize > _options.RecompressionMemoryMaxMB * 1000L * 1000L
                     || estimatedUncompressedSize >=
                     1_900_000_000) // 1.9GB hard limit to leave a 100MB buffer just in case the estimation is off.
                 {
@@ -144,9 +145,9 @@ namespace AdGoBye
             container.Bundle.file.Close();
             container.AssetsFile.file.Close();
 
-            File.Replace(file + ".clean", file, Settings.Options.Patcher.DisableBackupFile ? null : file + ".bak");
+            File.Replace(file + ".clean", file, _options.DisableBackupFile ? null : file + ".bak");
 
-            if (!Settings.Options.Patcher.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
+            if (!_options.DryRun) content.VersionMeta.PatchedBy.Add("Blocklist");
             foreach (var plugin in pluginsDidPatch)
             {
                 try
@@ -155,12 +156,12 @@ namespace AdGoBye
                 }
                 catch (Exception e)
                 {
-                    Logger.Error(e,
+                    logger.LogError(e,
                         "Plugin {Name} ({Maintainer}) v{Version} threw an exception while handling post disk write {ID} ({path})",
                         plugin.Name, plugin.Maintainer, plugin.Version, content.Id, content.VersionMeta.Path);
                 }
             }
-            Logger.Information("Processed {ID}", content.Id);
+            logger.LogInformation("Processed {ID}", content.Id);
         }
 
         private static long EstimateDecompressedSize(AssetBundleFile assetBundleFile)

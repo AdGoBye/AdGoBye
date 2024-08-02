@@ -1,24 +1,25 @@
 global using AdGoBye.Types;
+using System.Text;
 using AdGoBye;
 using AdGoBye.Database;
-using AdGoBye.Plugins;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Serilog;
-using Serilog.Core;
-using Serilog.Events;
-using Serilog.Templates;
-using Serilog.Templates.Themes;
 
 internal class Program
 {
-    private static bool _isLoggerSet;
+    private static bool _isLogSet;
 
     private static async Task Main()
     {
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
-            if (_isLoggerSet)
-                Log.Logger.Error(e.ExceptionObject as Exception,
+            if (_isLogSet)
+                Log.Error(e.ExceptionObject as Exception,
                     "Unhandled Error occured (isTerminating: {isTerminating}). Please report this.",
                     e.IsTerminating);
             else
@@ -28,7 +29,7 @@ internal class Program
 
             if (!e.IsTerminating) return;
 #if !DEBUG // Only block terminating unhandled exceptions in release mode, this can be annoying in debug mode.
-            if (_isLoggerSet) Log.Logger.Information("Press [ENTER] to exit.");
+            if (_isLogSet) Log.Log.Information("Press [ENTER] to exit.");
             else Console.WriteLine("Press [ENTER] to exit.");
 
 
@@ -36,63 +37,56 @@ internal class Program
 #endif
         };
 
-        Console.OutputEncoding = System.Text.Encoding.UTF8;
+        Console.OutputEncoding = Encoding.UTF8;
+        var builder = Host.CreateApplicationBuilder();
 
-        var levelSwitch = new LoggingLevelSwitch
-        {
-            MinimumLevel = (LogEventLevel)Settings.Options.LogLevel
-        };
+        builder.Configuration.AddJsonFile("appsettings.json").Build();
+        Settings.ConvertV1SettingsToV2(builder.Configuration);
+        Settings.ConvertV2SettingsToV3(builder.Configuration);
 
-        Log.Logger = new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
-            .WriteTo.Console(new ExpressionTemplate(
-                "[{@t:HH:mm:ss} {@l:u3} {Coalesce(Substring(SourceContext, LastIndexOf(SourceContext, '.') + 1),'<none>')}] {@m}\n{@x}",
-                theme: TemplateTheme.Literate))
-            .CreateLogger();
+        builder.Services.AddSerilog((_, configuration) =>
+            configuration.ReadFrom.Configuration(builder.Configuration));
+        _isLogSet = true;
 
-        _isLoggerSet = true;
-
-        var logger = Log.ForContext(typeof(Program));
-
-        SingleInstance.Attach();
-
-        if (Settings.Options.EnableUpdateCheck) Updater.CheckUpdates();
+        var configRoot = builder.Configuration.GetSection(nameof(Settings));
+        builder.Services.Configure<Settings.SettingsOptionsV3>(configRoot);
+        builder.Services.Configure<Settings.BlocklistOptions>(configRoot.GetSection("Blocklists"));
+        builder.Services.Configure<Settings.IndexerOptions>(configRoot.GetSection("Indexer"));
+        builder.Services.Configure<Settings.PatcherOptions>(configRoot.GetSection("Patcher"));
 
         await using var db = new AdGoByeContext();
-        db.Database.Migrate();
-        Blocklist.UpdateNetworkBlocklists();
-        Blocklist.ParseAllBlocklists();
-        Indexer.ManageIndex();
+        await db.Database.MigrateAsync();
 
-        PluginLoader.LoadPlugins();
-        foreach (var plugin in PluginLoader.LoadedPlugins)
-        {
-            logger.Information("Plugin {Name} ({Maintainer}) v{Version} is loaded.", plugin.Name, plugin.Maintainer,
-                plugin.Version);
-            logger.Information("Plugin type: {Type}", plugin.Instance.PluginType());
+        builder.Services.RegisterLiveServices();
+        builder.Services.AddSingleton<Indexer>();
+        builder.Services.AddSingleton<Blocklist>();
+        builder.Services.AddSingleton<Patcher>();
+        builder.Services.AddSingleton<PluginLoader>();
+        var host = builder.Build();
+        SingleInstance.Attach();
 
-            if (plugin.Instance.PluginType() == EPluginType.ContentSpecific)
-                logger.Information("Responsible for {IDs}", plugin.Instance.ResponsibleForContentIds());
-        }
+        var logger = host.Services.GetRequiredService<ILogger<Program>>();
+        var blocklists = host.Services.GetRequiredService<Blocklist>();
+        var patcher = host.Services.GetRequiredService<Patcher>();
+        var globalOptions = host.Services.GetRequiredService<IOptions<Settings.SettingsOptionsV3>>().Value;
 
-        if (Blocklist.Blocks == null || Blocklist.Blocks.Count == 0)
-            logger.Information("No blocklist has been loaded, is this intentional?");
-        logger.Information("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
-            Blocklist.Blocks?.Count, db.Content.Count());
+        await host.StartAsync();
+
+        if (globalOptions.EnableUpdateCheck) Updater.CheckUpdates();
+
+
+
+        logger.LogInformation("Loaded blocks for {blockCount} worlds and indexed {indexCount} pieces of content",
+            blocklists.Blocks.Count, db.Content.Count());
 
         Parallel.ForEach(db.Content.Include(content => content.VersionMeta),
-            new ParallelOptions { MaxDegreeOfParallelism = Settings.Options.MaxPatchThreads }, content =>
+            new ParallelOptions
             {
-                if (content.Type != ContentType.World) return;
-                Patcher.PatchContent(content);
-            });
+                MaxDegreeOfParallelism = globalOptions.Patcher.MaxPatchThreads
+            }, content => { patcher.PatchContent(content); });
 
-        db.SaveChanges();
-
-        if (Settings.Options.EnableLive)
-        {
-            _ = Task.Run(() => Live.WatchNewContent(Indexer.WorkingDirectory));
-            _ = Task.Run(() => Live.WatchLogFile(Indexer.WorkingDirectory));
-            await Task.Delay(Timeout.Infinite).ConfigureAwait(false);
-        }
+        await db.SaveChangesAsync();
+        if (!globalOptions.EnableLive) await host.StopAsync();
+        await host.WaitForShutdownAsync();
     }
 }
