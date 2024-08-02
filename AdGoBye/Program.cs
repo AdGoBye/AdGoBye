@@ -39,7 +39,6 @@ internal class Program
 
         Console.OutputEncoding = Encoding.UTF8;
         var builder = Host.CreateApplicationBuilder();
-
         builder.Configuration.AddJsonFile("appsettings.json").Build();
         Settings.ConvertV1SettingsToV2(builder.Configuration);
         Settings.ConvertV2SettingsToV3(builder.Configuration);
@@ -53,6 +52,8 @@ internal class Program
         builder.Services.Configure<Settings.BlocklistOptions>(configRoot.GetSection("Blocklists"));
         builder.Services.Configure<Settings.IndexerOptions>(configRoot.GetSection("Indexer"));
         builder.Services.Configure<Settings.PatcherOptions>(configRoot.GetSection("Patcher"));
+
+        builder.Services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.Zero);
 
         builder.Services.AddDbContextFactory<AdGoByeContext>(optionsBuilder =>
         {
