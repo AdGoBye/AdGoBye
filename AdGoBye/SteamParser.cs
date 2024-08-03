@@ -68,7 +68,7 @@ public static class SteamParser
             string line;
             try
             {
-                line = File.ReadLines(path + "/steamapps/" + $"appmanifest_{Appid}.acf")
+                line = File.ReadLines(Path.Combine(path, "steamapps/", $"appmanifest_{Appid}.acf"))
                     .First(readLine => readLine.Contains("name"));
             }
             catch (FileNotFoundException)
@@ -133,10 +133,11 @@ public static class SteamParser
     {
         if (OperatingSystem.IsLinux())
         {
-            const string dotSteam = "/.steam/steam/";
-            var homeSteamPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + dotSteam;
-            var flatpakSteamPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) +
-                                   "/.var/app/com.valvesoftware.Steam" + dotSteam;
+            const string dotSteam = ".steam/steam/";
+
+            var homeSteamPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), dotSteam);
+            var flatpakSteamPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "/.var/app/com.valvesoftware.Steam", dotSteam);
 
             if (Directory.Exists(homeSteamPath)) return homeSteamPath;
             if (Directory.Exists(flatpakSteamPath)) return flatpakSteamPath;

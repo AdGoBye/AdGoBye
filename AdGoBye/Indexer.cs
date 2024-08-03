@@ -108,7 +108,7 @@ public class Indexer
             }
 
 
-            if (!File.Exists(highestVersionDir.FullName + "/__data"))
+            if (!File.Exists(Path.Combine(highestVersionDir.FullName, "__data")))
             {
                 container.RemoveContent.Add(content);
                 _logger.LogWarning(
@@ -175,7 +175,7 @@ public class Indexer
             return;
         }
 
-        if (!File.Exists(directory!.FullName + "/__data")) return;
+        if (!File.Exists(Path.Combine(directory!.FullName, "__data"))) return;
         content = FileToContent(directory);
         if (content is null) return;
 
@@ -226,7 +226,7 @@ public class Indexer
         bool IsAvatarImposter(string contentPath)
         {
             AssetsManager manager = new();
-            var bundleInstance = manager.LoadBundleFile(contentPath + "/__data");
+            var bundleInstance = manager.LoadBundleFile(Path.Combine(contentPath, "__data"));
             var assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 0);
 
             foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoScript))
@@ -262,7 +262,7 @@ public class Indexer
         string ResolveUnityVersion(string contentPath)
         {
             AssetsManager manager = new();
-            var bundleInstance = manager.LoadBundleFile(contentPath + "/__data");
+            var bundleInstance = manager.LoadBundleFile(Path.Combine(contentPath, "__data"));
             var assetInstance = manager.LoadAssetsFileFromBundle(bundleInstance, 1);
 
             foreach (var monoScript in assetInstance.file.GetAssetsOfType(AssetClassID.MonoBehaviour))
@@ -365,7 +365,7 @@ public class Indexer
 
         try
         {
-            bundleInstance = manager.LoadBundleFile(path + "/__data");
+            bundleInstance = manager.LoadBundleFile(Path.Combine(path, "__data"));
         }
         catch (NotImplementedException e)
         {
@@ -462,7 +462,7 @@ public class Indexer
         var appName = SteamParser.GetApplicationName();
         var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
             .Replace("Roaming", "LocalLow");
-        var pathToWorkingDir = $@"{appName}\{appName}\";
+        var pathToWorkingDir = $"{appName}/{appName}/";
         var defaultWorkingDir = Path.Combine(appDataFolder, pathToWorkingDir);
         var customWorkingDir = ReadConfigFile(defaultWorkingDir);
         if (!string.IsNullOrEmpty(customWorkingDir))
@@ -477,12 +477,11 @@ public class Indexer
         string ConstructLinuxWorkingPath()
         {
             var protonWorkingPath =
-                $"/steamapps/compatdata/{SteamParser.Appid}/pfx/drive_c/users/steamuser/AppData/LocalLow/{pathToWorkingDir}";
+                $"steamapps/compatdata/{SteamParser.Appid}/pfx/drive_c/users/steamuser/AppData/LocalLow/{pathToWorkingDir}";
 
-            if (string.IsNullOrEmpty(SteamParser.AlternativeLibraryPath))
-                return SteamParser.GetPathToSteamRoot() + protonWorkingPath;
-
-            return SteamParser.AlternativeLibraryPath + protonWorkingPath;
+            return Path.Combine(string.IsNullOrEmpty(SteamParser.AlternativeLibraryPath)
+                ? SteamParser.GetPathToSteamRoot()
+                : SteamParser.AlternativeLibraryPath, protonWorkingPath);
         }
     }
 
