@@ -14,7 +14,7 @@ public static class SteamParser
     [SuppressMessage("Usage", "CA2211:Non-constant fields should not be visible")]
     // Contains the path to non-default library path if not empty. Only relevant on Linux where Proton changes
     // the working path's root.
-    public static string AlternativeLibraryPath = "";
+    public static string? AlternativeLibraryPath;
 
     public static string GetApplicationName()
     {

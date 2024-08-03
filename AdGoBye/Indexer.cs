@@ -479,9 +479,7 @@ public class Indexer
             var protonWorkingPath =
                 $"steamapps/compatdata/{SteamParser.Appid}/pfx/drive_c/users/steamuser/AppData/LocalLow/{pathToWorkingDir}";
 
-            return Path.Combine(string.IsNullOrEmpty(SteamParser.AlternativeLibraryPath)
-                ? SteamParser.GetPathToSteamRoot()
-                : SteamParser.AlternativeLibraryPath, protonWorkingPath);
+            return Path.Combine(SteamParser.AlternativeLibraryPath ?? SteamParser.GetPathToSteamRoot(), protonWorkingPath);
         }
     }
 
