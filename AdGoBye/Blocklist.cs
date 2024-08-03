@@ -24,7 +24,7 @@ public class Blocklist
     private readonly IDbContextFactory<AdGoByeContext> _dbFac;
     private readonly ILogger<Blocklist> _logger;
     private readonly Settings.BlocklistOptions _options;
-    public required Dictionary<string, HashSet<GameObjectInstance>> Blocks;
+    public Dictionary<string, HashSet<GameObjectInstance>> Blocks;
 
     public Blocklist(ILogger<Blocklist> logger, IOptions<Settings.BlocklistOptions> options, IDbContextFactory<AdGoByeContext> dbFac)
     {
