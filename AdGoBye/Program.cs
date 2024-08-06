@@ -49,7 +49,7 @@ internal class Program
 
         var configRoot = builder.Configuration.GetSection(nameof(Settings));
         builder.Services.Configure<Settings.SettingsOptionsV3>(configRoot);
-        builder.Services.Configure<Settings.BlocklistOptions>(configRoot.GetSection("Blocklists"));
+        builder.Services.Configure<Settings.BlocklistOptions>(configRoot.GetSection("Blocklist"));
         builder.Services.Configure<Settings.IndexerOptions>(configRoot.GetSection("Indexer"));
         builder.Services.Configure<Settings.PatcherOptions>(configRoot.GetSection("Patcher"));
 
