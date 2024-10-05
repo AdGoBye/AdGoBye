@@ -132,8 +132,10 @@ public class Blocklist
     {
         using var db = _dbFac.CreateDbContext();
         var final = new List<BlocklistModel>();
-        Directory.CreateDirectory("./Blocklists");
-        foreach (var file in Directory.GetFiles("./Blocklists"))
+        var blocklistDirectory = Path.Combine(WorkingFolder.MainDirectory, "Blocklists");
+
+        Directory.CreateDirectory(blocklistDirectory);
+        foreach (var file in Directory.GetFiles(blocklistDirectory))
         {
             ParseAndAddBlocklist(file, File.ReadAllText(file));
         }

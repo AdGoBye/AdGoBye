@@ -38,8 +38,9 @@ internal class Program
         };
 
         Console.OutputEncoding = Encoding.UTF8;
+        WorkingFolder.GetWorkingFolder();
         var builder = Host.CreateApplicationBuilder();
-        builder.Configuration.AddJsonFile("appsettings.json").Build();
+        builder.Configuration.AddJsonFile(Path.Combine(WorkingFolder.MainDirectory, "appsettings.json")).Build();
         Settings.ConvertV1SettingsToV2(builder.Configuration);
         Settings.ConvertV2SettingsToV3(builder.Configuration);
 
@@ -58,7 +59,7 @@ internal class Program
         builder.Services.AddDbContextFactory<AdGoByeContext>(optionsBuilder =>
         {
             optionsBuilder.EnableSensitiveDataLogging();
-            optionsBuilder.UseSqlite("Data Source=database.db");
+            optionsBuilder.UseSqlite($"Data Source={Path.Combine(WorkingFolder.MainDirectory, "database.db")}");
         });
 
         builder.Services.RegisterLiveServices();

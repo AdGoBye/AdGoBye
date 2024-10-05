@@ -11,8 +11,8 @@ public static class Updater
 {
     private const string ConnectivityCheckUrl = "http://connectivity-check.ubuntu.com/";
     private const string GithubReleaseUrl = "https://api.github.com/repos/AdGoBye/AdGoBye/releases/latest";
-    private const string ETagFile = "ReleaseETag";
 
+    private static readonly string EtagFile = Path.Combine(WorkingFolder.MainDirectory, "ReleaseETag");
     private static readonly HttpClient Client = CreateHttpClient();
     private static readonly ILogger Logger = Log.ForContext(typeof(Updater));
 
@@ -96,14 +96,14 @@ public static class Updater
 
     private static void SaveETag(string etag)
     {
-        using var outputFile = new StreamWriter(ETagFile, false);
+        using var outputFile = new StreamWriter(EtagFile, false);
         outputFile.WriteLine(etag);
     }
 
     private static string? ReadETag()
     {
-        if (!File.Exists(ETagFile)) return null;
-        using var sr = new StreamReader(ETagFile);
+        if (!File.Exists(EtagFile)) return null;
+        using var sr = new StreamReader(EtagFile);
         return sr.ReadToEnd().Trim();
     }
 

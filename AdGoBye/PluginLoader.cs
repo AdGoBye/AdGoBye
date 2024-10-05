@@ -27,7 +27,10 @@ public class PluginLoader
 
     private void LoadPlugins()
     {
-        var pluginLoadPath = GetRelativeDirectoryPath("Plugins");
+        var pluginLoadPath = string.IsNullOrEmpty(WorkingFolder.MainDirectory)
+            ? GetRelativeDirectoryPath("Plugins")
+            : Path.Combine(WorkingFolder.MainDirectory, "Plugins");
+
         Directory.CreateDirectory(pluginLoadPath);
         var pluginsToLoad = Directory.GetFiles(pluginLoadPath, "*.dll");
 
