@@ -2,6 +2,7 @@
 using AdGoBye.PluginInternal;
 using AdGoBye.Plugins;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AdGoBye;
 
@@ -9,10 +10,12 @@ public class PluginLoader
 {
     public static readonly List<PluginEntry> LoadedPlugins = [];
     private readonly ILogger<PluginLoader> _logger;
+    private readonly Settings.SettingsOptionsV3 _options;
 
-    public PluginLoader(ILogger<PluginLoader> logger)
+    public PluginLoader(ILogger<PluginLoader> logger, IOptions<Settings.SettingsOptionsV3> options)
     {
         _logger = logger;
+        _options = options.Value;
         LoadPlugins();
         foreach (var plugin in LoadedPlugins)
         {
@@ -102,22 +105,22 @@ public class PluginLoader
         }
 
 #if !DEBUG
-        if (!Settings.Options.DisablePluginInstallWarning)
+        if (!_options.DisablePluginInstallWarning)
         {
             var allowlist = LoadPluginAllowlist();
             if (!allowlist.Contains($"{pluginName} ({pluginMaintainer}, {pluginVersion})"))
             {
-                Logger.Information("""
-                                   ======================================================
-                                   You are trying to run {Name} ({maintainer}, {version})
-                                   Plugins can run arbitrary code therefore can do everything on your system that you can, this includes installing malware or stealing your accounts.
+                _logger.LogInformation("""
+                                       ======================================================
+                                       You are trying to run {Name} ({maintainer}, {version})
+                                       Plugins can run arbitrary code therefore can do everything on your system that you can, this includes installing malware or stealing your accounts.
 
-                                   Be very suspicious when someone doesn't let you view the source code of a plugin, be watchful about where the file you're installing comes from.
-                                   The AdGoBye Team is not responsible for what Plugins do.
+                                       Be very suspicious when someone doesn't let you view the source code of a plugin, be watchful about where the file you're installing comes from.
+                                       The AdGoBye Team is not responsible for what Plugins do.
 
-                                   Input 'y' to allow this plugin or input anything else to skip this plugin.
-                                   ======================================================
-                                   """, pluginName, pluginMaintainer, pluginVersion);
+                                       Input 'y' to allow this plugin or input anything else to skip this plugin.
+                                       ======================================================
+                                       """, pluginName, pluginMaintainer, pluginVersion);
                 var input = Console.ReadLine();
 
                 if (input is null || !input.Equals("y", StringComparison.OrdinalIgnoreCase)) return;

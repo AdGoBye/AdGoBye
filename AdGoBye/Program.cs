@@ -29,7 +29,7 @@ internal class Program
 
             if (!e.IsTerminating) return;
 #if !DEBUG // Only block terminating unhandled exceptions in release mode, this can be annoying in debug mode.
-            if (_isLogSet) Log.Log.Information("Press [ENTER] to exit.");
+            if (_isLogSet) Log.Information("Press [ENTER] to exit.");
             else Console.WriteLine("Press [ENTER] to exit.");
 
 
